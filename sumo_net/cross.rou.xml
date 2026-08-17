@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  cross.rou.xml — Route and vehicle definitions for the Siren AI multi-junction SUMO demo.
+
+  Network topology (3 TLS linear chain):
+    [1] ──500 m── [J1/TLS] ──500 m── [J2/TLS] ──500 m── [J3/TLS] ──500 m── [3]
+
+  Edge naming convention:
+    e<from>_<to>  — directed edge from junction <from> to junction <to>
+
+  Ambulance dispatch route:
+    start="1" destination="3"
+    edges: e1_J1 → eJ1_J2 → eJ2_J3 → eJ3_3   (total 2000 m, 3 TLS green phases)
+-->
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+
+    <!-- ── Vehicle types ──────────────────────────────────────────────────── -->
+    <vType id="car"
+           accel="0.8" decel="4.5" sigma="0.5"
+           length="5" maxSpeed="13.89"
+           color="0.2,0.6,1.0"/>   <!-- blue-ish -->
+
+    <vType id="ambulance"
+           accel="2.6" decel="5.0" sigma="0.1"
+           length="5.5" maxSpeed="30.0"
+           color="1.0,1.0,1.0"
+           guiShape="emergency"
+           emergencyDecel="9.0"
+           lcStrategic="10.0"
+           lcCooperative="1.0"/>
+
+
+    <!-- ── Fixed routes ───────────────────────────────────────────────────── -->
+    <!-- West→East (node 1 → node 3, through J1→J2→J3) -->
+    <route id="WE" edges="e1_J1 eJ1_J2 eJ2_J3 eJ3_3"/>
+
+    <!-- East→West (node 3 → node 1, through J3→J2→J1) -->
+    <route id="EW" edges="e3_J3 eJ3_J2 eJ2_J1 eJ1_1"/>
+
+    <!-- Partial: 1→J2 (mid-point) -->
+    <route id="W_mid" edges="e1_J1 eJ1_J2"/>
+
+    <!-- Partial: 3→J2 (mid-point) -->
+    <route id="E_mid" edges="e3_J3 eJ3_J2"/>
+
+
+    <!-- ── Background car traffic (periodic departures for realistic state) ── -->
+    <vehicle id="car_WE_0" type="car" route="WE" depart="0"  />
+    <vehicle id="car_WE_1" type="car" route="WE" depart="10" />
+    <vehicle id="car_WE_2" type="car" route="WE" depart="20" />
+    <vehicle id="car_WE_3" type="car" route="WE" depart="30" />
+    <vehicle id="car_WE_4" type="car" route="WE" depart="40" />
+
+    <vehicle id="car_EW_0" type="car" route="EW" depart="5"  />
+    <vehicle id="car_EW_1" type="car" route="EW" depart="15" />
+    <vehicle id="car_EW_2" type="car" route="EW" depart="25" />
+    <vehicle id="car_EW_3" type="car" route="EW" depart="35" />
+
+    <vehicle id="car_WE_5" type="car" route="WE" depart="50" />
+    <vehicle id="car_EW_4" type="car" route="EW" depart="55" />
+    <vehicle id="car_WE_6" type="car" route="WE" depart="65" />
+    <vehicle id="car_EW_5" type="car" route="EW" depart="75" />
+
+
+    <!-- ── Ambulance — spawned at step 80, West→East (1→J1→J2→J3→3) ─────── -->
+    <!--    Dispatched via POST /dispatch {"start":"1","destination":"3"}     -->
+    <!--    This vehicle is used for the static sim demo only; the dispatch   -->
+    <!--    endpoint inserts a fresh ambulance via TraCI at runtime.          -->
+    <vehicle id="ambulance_0" type="ambulance" route="WE" depart="80"
+             departSpeed="max"/>
+
+</routes>

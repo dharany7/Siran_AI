@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- kilpauk.sumocfg - Siren AI real-world network, Kilpauk Chennai -->
+<sumoConfiguration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
+    <input>
+        <net-file   value="kilpauk.net.xml"/>
+        <route-files value="kilpauk_bg.rou.xml"/>
+    </input>
+    <time>
+        <begin value="0"/>
+        <end   value="3600"/>
+    </time>
+    <report>
+        <verbose     value="false"/>
+        <no-step-log value="true"/>
+        <no-warnings value="true"/>
+    </report>
+    <processing>
+        <ignore-route-errors value="true"/>
+    </processing>
+</sumoConfiguration>

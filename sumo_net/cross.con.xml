@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  cross.con.xml — Connection definitions for the 3-TLS linear chain network.
+
+  Defines allowed lane-to-lane connections at each TLS junction.
+  Without explicit connections, netconvert may omit straight through-movements.
+
+  West->East (ambulance path):
+    e1_J1  lane 0  ->  eJ1_J2  lane 0   (at J1)
+    eJ1_J2 lane 0  ->  eJ2_J3  lane 0   (at J2)
+    eJ2_J3 lane 0  ->  eJ3_3   lane 0   (at J3)
+
+  East->West (return path):
+    e3_J3  lane 0  ->  eJ3_J2  lane 0   (at J3)
+    eJ3_J2 lane 0  ->  eJ2_J1  lane 0   (at J2)
+    eJ2_J1 lane 0  ->  eJ1_1   lane 0   (at J1)
+-->
+<connections xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/connections_file.xsd">
+
+    <!-- Junction J1 connections -->
+    <connection from="e1_J1"  to="eJ1_J2" fromLane="0" toLane="0"/>
+    <connection from="eJ2_J1" to="eJ1_1"  fromLane="0" toLane="0"/>
+
+    <!-- Junction J2 connections -->
+    <connection from="eJ1_J2" to="eJ2_J3" fromLane="0" toLane="0"/>
+    <connection from="eJ3_J2" to="eJ2_J1" fromLane="0" toLane="0"/>
+
+    <!-- Junction J3 connections -->
+    <connection from="eJ2_J3" to="eJ3_3"  fromLane="0" toLane="0"/>
+    <connection from="e3_J3"  to="eJ3_J2" fromLane="0" toLane="0"/>
+
+</connections>

@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+python-jose[cryptography]
+"passlib[bcrypt]"
+bcrypt==4.2.1
+pydantic-settings
+librosa
+scikit-learn
+opencv-python
+easyocr
+requests
+python-dotenv
+google-genai

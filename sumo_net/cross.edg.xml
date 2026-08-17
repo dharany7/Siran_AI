@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  cross.edg.xml — Edge (road segment) definitions for the Siren AI multi-junction network.
+
+  Naming convention:
+    e<from>_<to>  — directed edge from junction <from> to junction <to>
+
+  All segments are 500 m, single lane, speed 13.89 m/s (50 km/h).
+  Edges are bidirectional (one edge per direction).
+
+  Ambulance route (west→east):
+    e1_J1 → eJ1_J2 → eJ2_J3 → eJ3_3   (total 2000 m, 3 TLS junctions)
+
+  Return route (east→west):
+    e3_J3 → eJ3_J2 → eJ2_J1 → eJ1_1
+-->
+<edges xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/edges_file.xsd">
+
+    <!-- Segment 1: entry node 1 ↔ junction J1 -->
+    <edge id="e1_J1"  from="1"  to="J1" priority="78" numLanes="1" speed="13.889"/>
+    <edge id="eJ1_1"  from="J1" to="1"  priority="78" numLanes="1" speed="13.889"/>
+
+    <!-- Segment 2: junction J1 ↔ junction J2 -->
+    <edge id="eJ1_J2" from="J1" to="J2" priority="78" numLanes="1" speed="13.889"/>
+    <edge id="eJ2_J1" from="J2" to="J1" priority="78" numLanes="1" speed="13.889"/>
+
+    <!-- Segment 3: junction J2 ↔ junction J3 -->
+    <edge id="eJ2_J3" from="J2" to="J3" priority="78" numLanes="1" speed="13.889"/>
+    <edge id="eJ3_J2" from="J3" to="J2" priority="78" numLanes="1" speed="13.889"/>
+
+    <!-- Segment 4: junction J3 ↔ exit node 3 -->
+    <edge id="eJ3_3"  from="J3" to="3"  priority="78" numLanes="1" speed="13.889"/>
+    <edge id="e3_J3"  from="3"  to="J3" priority="78" numLanes="1" speed="13.889"/>
+
+</edges>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  cross.nod.xml — Node (junction) definitions for the Siren AI multi-junction network.
+
+  Topology: linear chain of 3 TLS intersections
+  (single-lane bidirectional road, west→east)
+
+    [1] ──500 m── [J1/TLS] ──500 m── [J2/TLS] ──500 m── [J3/TLS] ──500 m── [3]
+
+  Junction IDs:
+    "1"   – West entry endpoint   (priority, no TLS)
+    "J1"  – First  TLS junction   (traffic_light)
+    "J2"  – Second TLS junction   (traffic_light)
+    "J3"  – Third  TLS junction   (traffic_light)
+    "3"   – East  exit endpoint   (priority, no TLS)
+-->
+<nodes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/nodes_file.xsd">
+
+    <!-- West entry stub -->
+    <node id="1"  x="0.0"    y="0.0"  type="priority"/>
+
+    <!-- Three signalised intersections -->
+    <node id="J1" x="500.0"  y="0.0"  type="traffic_light"/>
+    <node id="J2" x="1000.0" y="0.0"  type="traffic_light"/>
+    <node id="J3" x="1500.0" y="0.0"  type="traffic_light"/>
+
+    <!-- East exit stub -->
+    <node id="3"  x="2000.0" y="0.0"  type="priority"/>
+
+</nodes>

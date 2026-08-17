@@ -1,0 +1,2063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Siren-AI — Driver</title>
+  <meta name="description" content="Siren-AI ambulance driver — real-time dispatch and green corridor routing across Kilpauk, Chennai.">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    /* ── Design tokens ───────────────────────────────────────────────── */
+    :root {
+      --bg:        #0A0E17;
+      --panel:     #121826;
+      --panel-2:   #171F31;
+      --panel-3:   #1D2640;
+      --line:      #232C42;
+      --line-2:    #2C3750;
+      --text:      #E7EBF3;
+      --muted:     #7C8AA8;
+      --muted-2:   #5A6882;
+      --amber:     #FFB020;
+      --teal:      #22D9C0;
+      --teal-dim:  rgba(34,217,192,0.15);
+      --red:       #FF4757;
+      --red-dim:   rgba(255,71,87,0.15);
+      --blue:      #4C8DFF;
+      --green:     #2EE05B;
+      --green-dim: rgba(46,224,91,0.15);
+      --radius:    14px;
+      --radius-sm: 8px;
+      --sheet-h:   380px;
+      --sheet-peek: 110px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%; width: 100%;
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Map layer ───────────────────────────────────────────────────── */
+    #map {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    /* Dark map filter */
+    .leaflet-tile-pane { filter: brightness(0.55) saturate(0.7) hue-rotate(200deg); }
+
+    /* ── Top bar ─────────────────────────────────────────────────────── */
+    #topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px 12px;
+      background: linear-gradient(to bottom, rgba(10,14,23,0.95) 0%, rgba(10,14,23,0) 100%);
+      pointer-events: none;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 10px;
+      pointer-events: all;
+    }
+    .brand-mark {
+      width: 34px; height: 34px; border-radius: 10px;
+      background: conic-gradient(from 220deg, var(--red), var(--amber), var(--teal), var(--red));
+      display: flex; align-items: center; justify-content: center;
+      position: relative; flex-shrink: 0;
+      box-shadow: 0 4px 14px rgba(255,71,87,.4);
+    }
+    .brand-mark::after {
+      content:''; position:absolute; inset:3px;
+      background: var(--bg); border-radius: 7px;
+    }
+    .brand-mark::before {
+      content:''; position:absolute; width:8px; height:8px;
+      background: var(--red); border-radius:50%; z-index:2;
+      box-shadow: 0 0 10px var(--red);
+      animation: pulse-dot 1.4s infinite;
+    }
+    .brand-text {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700; font-size: 17px; line-height: 1;
+    }
+    .brand-sub { font-size: 10px; color: var(--muted); letter-spacing: 1.2px; text-transform: uppercase; margin-top: 2px; }
+
+    #dispatchingBadge {
+      display: none;
+      background: var(--red); color: #fff;
+      font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase;
+      padding: 6px 12px; border-radius: 100px;
+      pointer-events: all;
+      animation: badge-pulse 1.2s infinite;
+      box-shadow: 0 0 20px rgba(255,71,87,.5);
+    }
+    @keyframes badge-pulse { 0%,100%{opacity:1} 50%{opacity:.7} }
+
+    /* ── Floating action buttons ─────────────────────────────────────── */
+    .fab-group {
+      position: fixed; right: 16px; bottom: calc(var(--sheet-peek) + 24px);
+      z-index: 100; display: flex; flex-direction: column; gap: 10px;
+    }
+    .fab {
+      width: 44px; height: 44px; border-radius: 12px;
+      border: 1px solid var(--line); background: rgba(18,24,38,0.92);
+      backdrop-filter: blur(10px);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 18px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.4);
+      transition: transform .12s, background .15s;
+    }
+    .fab:hover { background: var(--panel-2); }
+    .fab:active { transform: scale(.93); }
+
+    /* ── Bottom sheet ────────────────────────────────────────────────── */
+    #sheet {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 200;
+      background: var(--panel);
+      border-radius: 22px 22px 0 0;
+      border-top: 1px solid var(--line-2);
+      box-shadow: 0 -8px 40px rgba(0,0,0,.5);
+      height: var(--sheet-h);
+      transform: translateY(calc(var(--sheet-h) - var(--sheet-peek)));
+      transition: transform .35s cubic-bezier(.32,.72,0,1);
+      will-change: transform;
+      touch-action: none;
+      user-select: none;
+    }
+    #sheet.expanded {
+      transform: translateY(0);
+    }
+    #sheet.dispatching {
+      --sheet-peek: 160px;
+      transform: translateY(calc(var(--sheet-h) - var(--sheet-peek)));
+    }
+
+    .sheet-handle {
+      display: flex; justify-content: center; padding: 12px 0 8px;
+      cursor: grab;
+    }
+    .sheet-handle:active { cursor: grabbing; }
+    .sheet-handle-bar {
+      width: 38px; height: 4px; border-radius: 2px;
+      background: var(--line-2);
+    }
+
+    .sheet-body {
+      padding: 0 20px 24px;
+      overflow-y: auto;
+      max-height: calc(var(--sheet-h) - 40px);
+    }
+
+    /* ── Sheet views ─────────────────────────────────────────────────── */
+    .sheet-view { display: none; }
+    .sheet-view.active { display: block; }
+
+    /* ── Login view ──────────────────────────────────────────────────── */
+    .login-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 18px; font-weight: 700; margin-bottom: 4px;
+    }
+    .login-sub { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+
+    .field-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+
+    .input-wrap {
+      background: var(--panel-2); border: 1px solid var(--line);
+      border-radius: var(--radius-sm); overflow: hidden;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .input-wrap:focus-within {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px var(--teal-dim);
+    }
+    .input-inner {
+      display: flex; align-items: center; padding: 0 14px; gap: 10px;
+    }
+    .input-icon { color: var(--muted); font-size: 15px; flex-shrink: 0; }
+    input[type="text"], input[type="tel"], input[type="password"] {
+      flex: 1; background: transparent; border: none; outline: none;
+      color: var(--text); font-family: 'Inter', sans-serif;
+      font-size: 14px; height: 46px;
+    }
+    input::placeholder { color: var(--muted-2); }
+
+    /* ── Signup extra fields ─────────────────────────────────────────── */
+    #signupExtra { display: none; }
+    #signupExtra.visible { display: block; }
+
+    /* ── Tabs ────────────────────────────────────────────────────────── */
+    .auth-tabs {
+      display: flex; gap: 0;
+      background: var(--panel-2); border-radius: var(--radius-sm);
+      padding: 3px; margin-bottom: 18px;
+    }
+    .auth-tab {
+      flex: 1; text-align: center; padding: 8px 0;
+      border-radius: 6px; cursor: pointer;
+      font-size: 13px; font-weight: 600;
+      color: var(--muted); transition: all .2s;
+    }
+    .auth-tab.active {
+      background: var(--panel-3); color: var(--text);
+      box-shadow: 0 1px 4px rgba(0,0,0,.3);
+    }
+
+    /* ── Buttons ─────────────────────────────────────────────────────── */
+    .btn-primary {
+      width: 100%; height: 50px; border: none; border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, #e8303e 0%, var(--red) 100%);
+      color: #fff; font-family: 'Space Grotesk', sans-serif;
+      font-size: 15px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+      box-shadow: 0 4px 20px rgba(255,71,87,.4);
+      transition: transform .12s, box-shadow .12s, opacity .15s;
+      position: relative; overflow: hidden;
+    }
+    .btn-primary:active:not(:disabled) { transform: scale(.97); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary.teal {
+      background: linear-gradient(135deg, #1ab8a2 0%, var(--teal) 100%);
+      box-shadow: 0 4px 20px rgba(34,217,192,.35);
+    }
+    .btn-primary.green {
+      background: linear-gradient(135deg, #20b845 0%, var(--green) 100%);
+      box-shadow: 0 4px 20px rgba(46,224,91,.35);
+    }
+
+    .btn-link {
+      background: none; border: none; color: var(--teal);
+      font-size: 12px; cursor: pointer; padding: 0;
+      text-decoration: underline;
+    }
+
+    /* ── Driver view ─────────────────────────────────────────────────── */
+    .driver-header {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 16px; padding-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .driver-avatar {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--teal), var(--blue));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    .driver-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600; font-size: 15px;
+    }
+    .driver-plate {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; color: var(--muted); margin-top: 2px;
+    }
+
+    /* Online toggle */
+    .online-toggle-wrap {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--panel-2); border: 1px solid var(--line);
+      border-radius: var(--radius-sm); padding: 12px 14px;
+      margin-bottom: 14px; cursor: pointer;
+    }
+    .online-toggle-wrap.online {
+      border-color: rgba(46,224,91,.35);
+      background: var(--green-dim);
+    }
+    .online-label {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .online-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--muted); transition: background .3s;
+      flex-shrink: 0;
+    }
+    .online-toggle-wrap.online .online-dot {
+      background: var(--green); box-shadow: 0 0 8px var(--green);
+      animation: pulse-dot 1.4s infinite;
+    }
+    .online-text {
+      font-weight: 600; font-size: 14px;
+    }
+    .toggle-pill {
+      width: 44px; height: 24px; border-radius: 12px;
+      background: var(--line); position: relative;
+      transition: background .25s;
+    }
+    .online-toggle-wrap.online .toggle-pill { background: var(--green); }
+    .toggle-pill::after {
+      content: ''; position: absolute;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #fff; top: 3px; left: 3px;
+      transition: transform .25s; box-shadow: 0 1px 4px rgba(0,0,0,.3);
+    }
+    .online-toggle-wrap.online .toggle-pill::after { transform: translateX(20px); }
+
+    /* Hospital search */
+    .section-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 1.2px;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 8px;
+    }
+    .hosp-search-wrap {
+      background: var(--panel-2); border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      display: flex; align-items: center; padding: 0 12px; gap: 8px;
+      margin-bottom: 6px;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .hosp-search-wrap:focus-within {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px var(--teal-dim);
+    }
+    .hosp-search-wrap input {
+      flex: 1; background: transparent; border: none; outline: none;
+      color: var(--text); font-size: 13.5px; height: 42px;
+    }
+    .hosp-search-icon { color: var(--muted); font-size: 15px; }
+    .hosp-list {
+      max-height: 110px; overflow-y: auto;
+      scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+      margin-bottom: 14px;
+    }
+    .hosp-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: 8px;
+      cursor: pointer; transition: background .15s;
+    }
+    .hosp-item:hover { background: var(--panel-3); }
+    .hosp-item.selected { background: var(--teal-dim); }
+    .hosp-item-icon {
+      width: 28px; height: 28px; border-radius: 7px;
+      background: rgba(76,141,255,.12); border: 1px solid rgba(76,141,255,.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; flex-shrink: 0;
+    }
+    .hosp-item.selected .hosp-item-icon {
+      background: var(--teal-dim); border-color: rgba(34,217,192,.3);
+    }
+    .hosp-item-name {
+      font-size: 13px; font-weight: 500; line-height: 1.3;
+    }
+    .hosp-item-dist {
+      font-size: 11px; color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      margin-left: auto; flex-shrink: 0;
+    }
+
+    /* ── ETA dispatching view ────────────────────────────────────────── */
+    #dispatchView {
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    .eta-header {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .eta-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: var(--teal-dim); border: 1px solid rgba(34,217,192,.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+      animation: pulse-scale 1.8s infinite ease-in-out;
+    }
+    @keyframes pulse-scale { 0%,100%{transform:scale(1)} 50%{transform:scale(1.07)} }
+
+    .eta-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 15px; font-weight: 700; color: var(--teal);
+    }
+    .eta-hospital {
+      font-size: 12px; color: var(--muted); margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 230px;
+    }
+
+    .eta-stats {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+    .eta-stat {
+      background: var(--panel-2); border: 1px solid var(--line);
+      border-radius: var(--radius-sm); padding: 10px 12px; text-align: center;
+    }
+    .eta-stat-label {
+      font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 4px;
+    }
+    .eta-stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 17px; font-weight: 500;
+    }
+    .eta-stat-value.teal { color: var(--teal); }
+    .eta-stat-value.amber { color: var(--amber); }
+    .eta-stat-value.green { color: var(--green); }
+
+    .progress-track {
+      height: 3px; background: var(--line); border-radius: 2px; overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%; width: 0%; background: var(--teal);
+      border-radius: 2px;
+      transition: width .5s ease;
+      box-shadow: 0 0 8px var(--teal);
+    }
+
+    .tls-row {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+    .tls-badge {
+      font-size: 10px; font-family: 'JetBrains Mono', monospace;
+      background: rgba(76,141,255,.12); border: 1px solid rgba(76,141,255,.2);
+      border-radius: 5px; padding: 3px 7px; color: var(--blue);
+    }
+    .tls-badge.cleared {
+      background: var(--green-dim); border-color: rgba(46,224,91,.3); color: var(--green);
+    }
+
+    .btn-cancel {
+      width: 100%; height: 42px; border: 1px solid var(--line);
+      background: transparent; border-radius: var(--radius-sm);
+      color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: border-color .15s, color .15s;
+    }
+    .btn-cancel:hover { border-color: var(--red); color: var(--red); }
+
+    /* ── Toasts ──────────────────────────────────────────────────────── */
+    #toast {
+      position: fixed; top: 72px; left: 50%; transform: translateX(-50%);
+      z-index: 500; max-width: 340px; width: calc(100% - 32px);
+      background: var(--panel-2); border: 1px solid var(--line);
+      border-radius: var(--radius-sm); padding: 12px 16px;
+      display: flex; align-items: flex-start; gap: 10px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.5);
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s;
+    }
+    #toast.show { opacity: 1; pointer-events: all; }
+    #toast.error { border-color: rgba(255,71,87,.4); background: var(--red-dim); }
+    #toast.success { border-color: rgba(46,224,91,.4); background: var(--green-dim); }
+    .toast-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+    .toast-msg { font-size: 13px; line-height: 1.4; }
+
+    /* ── Spinner ─────────────────────────────────────────────────────── */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Pulsing location marker ─────────────────────────────────────── */
+    @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(.8)} }
+    @keyframes pulse-ring {
+      0% { transform: scale(.5); opacity: 1; }
+      100% { transform: scale(2.5); opacity: 0; }
+    }
+
+    /* ── Scrollbar ───────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+
+    /* ── Map route shimmer ───────────────────────────────────────────── */
+    @keyframes dash-anim {
+      to { stroke-dashoffset: 0; }
+    }
+
+    /* ── TLS signal markers ─────────────────────────────────────────── */
+    /* Each marker is a small traffic-light box rendered as an HTML divIcon.
+       The inner circle (.tls-dot) transitions between red (default) and
+       green (when the sim step reaches green_at_step for that junction). */
+    .tls-marker {
+      width: 28px; height: 28px;
+      border-radius: 7px;
+      border: 2px solid rgba(255,255,255,.25);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,.5);
+      transition: background .35s, border-color .35s, box-shadow .35s;
+    }
+    .tls-marker.red   { background: rgba(255,71,87,.85);  border-color: rgba(255,71,87,.6);
+                        box-shadow: 0 0 10px rgba(255,71,87,.5); }
+    .tls-marker.green { background: rgba(46,224,91,.88);  border-color: rgba(46,224,91,.5);
+                        box-shadow: 0 0 14px rgba(46,224,91,.7); }
+    .tls-marker.passed{ background: rgba(76,141,255,.6);  border-color: rgba(76,141,255,.4);
+                        box-shadow: 0 0 8px rgba(76,141,255,.4); }
+    .tls-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #fff; opacity: .9;
+      transition: opacity .3s;
+    }
+    @keyframes tls-pulse-green {
+      0%,100% { box-shadow: 0 0 14px rgba(46,224,91,.7); }
+      50%      { box-shadow: 0 0 24px rgba(46,224,91,1); }
+    }
+    .tls-marker.green { animation: tls-pulse-green 1s infinite; }
+
+    /* ── Moving ambulance icon (separate from the driver GPS dot) ───────── */
+    .amb-icon {
+      width: 34px; height: 34px;
+      background: var(--red);
+      border-radius: 10px;
+      border: 2px solid #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 0 14px rgba(255,71,87,.7);
+      animation: amb-pulse 1s infinite;
+    }
+    @keyframes amb-pulse {
+      0%,100% { box-shadow: 0 0 14px rgba(255,71,87,.7); }
+      50%      { box-shadow: 0 0 28px rgba(255,71,87,1), 0 0 6px #fff; }
+    }
+    /* ── Demo GPS location panel ─────────────────────────────────────── */
+    /* sidebar-header: hidden on mobile, shown on desktop via media query */
+    .sidebar-header { display: none; }
+
+    .demo-loc-panel {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .demo-loc-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; cursor: pointer;
+      user-select: none;
+      transition: background .15s;
+    }
+    .demo-loc-header:hover { background: rgba(255,255,255,.03); }
+    .demo-loc-rows {
+      display: none;   /* collapsed by default — click header to expand */
+      padding: 0 14px 12px;
+      border-top: 1px solid var(--line);
+      padding-top: 10px;
+    }
+    .demo-loc-panel.open .demo-loc-rows { display: block; }
+    .gps-badge {
+      font-size: 10px; font-weight: 700; letter-spacing: .5px;
+      background: rgba(251,188,5,.12); border: 1px solid rgba(251,188,5,.3);
+      color: #FBBC05; border-radius: 5px; padding: 2px 7px;
+    }
+    .demo-select {
+      flex: 1; background: var(--panel-1); border: 1px solid var(--line);
+      color: var(--text); border-radius: var(--radius-sm);
+      font-size: 12px; padding: 7px 10px; outline: none;
+      font-family: inherit; cursor: pointer;
+    }
+    .demo-select:focus { border-color: var(--teal); }
+    .demo-coord-wrap {
+      flex: 1; display: flex; flex-direction: column; gap: 2px;
+    }
+    .demo-coord-label {
+      font-size: 9px; text-transform: uppercase; letter-spacing: .8px;
+      color: var(--muted); padding-left: 2px;
+    }
+    .demo-coord-input {
+      background: var(--panel-1); border: 1px solid var(--line);
+      color: var(--text); border-radius: var(--radius-sm);
+      font-size: 12px; padding: 6px 8px; outline: none;
+      font-family: 'JetBrains Mono', monospace; width: 100%;
+    }
+    .demo-coord-input:focus { border-color: var(--teal); }
+    .demo-apply-btn {
+      align-self: flex-end; padding: 6px 12px;
+      background: var(--teal); color: #000;
+      border: none; border-radius: var(--radius-sm);
+      font-size: 11px; font-weight: 700; cursor: pointer;
+      white-space: nowrap; transition: opacity .15s;
+    }
+    .demo-apply-btn:hover { opacity: .85; }
+    .demo-gps-toggle {
+      width: 100%; padding: 7px; margin-top: 2px;
+      background: transparent; border: 1px solid var(--line);
+      color: var(--muted); border-radius: var(--radius-sm);
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      transition: border-color .15s, color .15s;
+    }
+    .demo-gps-toggle:hover { border-color: var(--teal); color: var(--teal); }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       DESKTOP SIDEBAR LAYOUT  (>768px)
+       #app-wrap becomes a flex row.
+       #sheet becomes a static sidebar (400px, full height, scroll internally).
+       #map fills the remaining width.
+       Everything else (mobile topbar, drag handle) is hidden.
+       ═══════════════════════════════════════════════════════════════════ */
+    @media (min-width: 769px) {
+      /* Root layout */
+      html, body { overflow: hidden; }
+
+      #app-wrap {
+        display: flex;
+        flex-direction: row;
+        height: 100vh;
+        width: 100vw;
+        position: static;           /* undo mobile absolute/relative tricks */
+      }
+
+      /* Map fills remaining space */
+      #map {
+        flex: 1;
+        position: relative;         /* Leaflet requires positioned parent */
+        height: 100vh;
+        width: auto;
+      }
+
+      /* Sidebar */
+      #sheet {
+        position: static !important;         /* override mobile position:absolute */
+        transform: none !important;          /* no translate */
+        width: 400px;
+        min-width: 400px;
+        max-width: 400px;
+        height: 100vh;
+        border-radius: 0 !important;
+        border-right: 1px solid var(--line);
+        border-top: none !important;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        order: -1;                           /* sidebar on the LEFT */
+        background: var(--panel);
+        box-shadow: 2px 0 20px rgba(0,0,0,.4);
+      }
+
+      /* Sidebar brand header — visible on desktop */
+      .sidebar-header {
+        display: flex !important;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--line);
+        flex-shrink: 0;
+        background: var(--panel);
+      }
+      #dispatchingBadgeSidebar {
+        font-size: 11px; font-weight: 700; letter-spacing: 1px;
+        color: var(--red); background: var(--red-dim);
+        border: 1px solid rgba(255,71,87,.3);
+        border-radius: 6px; padding: 4px 10px;
+      }
+
+      /* sheet-body fills and scrolls */
+      .sheet-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px 20px 24px;
+      }
+
+      /* hide mobile-only elements */
+      #topbar        { display: none !important; }
+      .sheet-handle  { display: none !important; }
+
+      /* FABs on desktop: bottom-right of the map area */
+      .fab-group {
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+        left: auto;
+      }
+
+      /* Toast stays centred in the map area */
+      #toast {
+        left: calc(400px + 50%);
+        transform: translateX(-50%);
+      }
+
+      /* Hospital list: give it a fixed max-height so it scrolls in-place */
+      .hosp-list {
+        max-height: calc(100vh - 480px);
+        min-height: 120px;
+      }
+
+      /* ── Desktop dispatch layout ─────────────────────────────────────── */
+      /* viewDriver is always the active view on desktop — never swapped out */
+      #viewDriver {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;   /* fill sheet-body so children can flex-grow */
+      }
+
+      /* The swappable lower section: hospital list + button  ↔  ETA card */
+      #driverContent {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+      }
+      #driverContent .hosp-list { flex: 1; }
+      #dispatchBtn {
+        flex-shrink: 0;
+        margin-top: 12px;
+      }
+
+      /* ETA/dispatch card — hidden by default, shown on desktop during dispatch */
+      #dispatchCard {
+        display: none;
+        flex-direction: column;
+        gap: 12px;
+        flex: 1;
+        overflow-y: auto;
+      }
+      #viewDriver.dispatching-desktop #driverContent { display: none; }
+      #viewDriver.dispatching-desktop #dispatchCard  { display: flex; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     LAYOUT ROOT
+     Desktop : flex row → #sheet (sidebar, 400px) + #map (flex:1)
+     Mobile  : #map full-screen, #sheet overlays as bottom sheet
+     ═════════════════════════════════════════════════════════════════════ -->
+<div id="app-wrap">
+
+  <!-- Map — fills remaining width on desktop, full-screen on mobile -->
+  <div id="map"></div>
+
+  <!-- Mobile top bar (hidden on desktop via CSS) -->
+  <div id="topbar">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div>
+        <div class="brand-text">Siren-AI</div>
+        <div class="brand-sub">Driver</div>
+      </div>
+    </div>
+    <div id="dispatchingBadge">🚨 EN ROUTE</div>
+  </div>
+
+  <!-- FABs float over map on both layouts -->
+  <div class="fab-group" id="fabGroup">
+    <div class="fab" id="fabLocate" title="Center on my location">📍</div>
+    <div class="fab" id="fabZoomIn"  title="Zoom in">＋</div>
+    <div class="fab" id="fabZoomOut" title="Zoom out">－</div>
+  </div>
+
+  <!-- Sheet / Sidebar — flex sibling of #map on desktop, overlay on mobile -->
+  <div id="sheet">
+    <!-- Desktop sidebar brand header (hidden on mobile via CSS) -->
+    <div class="sidebar-header" id="sidebarHeader">
+      <div class="brand">
+        <div class="brand-mark"></div>
+        <div>
+          <div class="brand-text">Siren-AI</div>
+          <div class="brand-sub">Driver</div>
+        </div>
+      </div>
+      <div id="dispatchingBadgeSidebar" style="display:none">🚨 EN ROUTE</div>
+    </div>
+    <!-- Mobile drag handle (hidden on desktop) -->
+  <div class="sheet-handle" id="sheetHandle">
+    <div class="sheet-handle-bar"></div>
+  </div>
+  <div class="sheet-body" id="sheetBody">
+
+    <!-- ── View: Login / Signup ── -->
+    <div class="sheet-view active" id="viewAuth">
+      <div class="auth-tabs">
+        <div class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Login</div>
+        <div class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Sign Up</div>
+      </div>
+
+      <div class="field-group">
+        <div class="input-wrap">
+          <div class="input-inner">
+            <span class="input-icon">📱</span>
+            <input id="authPhone" type="tel" placeholder="+91 98765 43210" autocomplete="tel">
+          </div>
+        </div>
+        <div class="input-wrap">
+          <div class="input-inner">
+            <span class="input-icon">🔒</span>
+            <input id="authPassword" type="password" placeholder="Password (min 6 chars)" autocomplete="current-password">
+          </div>
+        </div>
+
+        <!-- Signup-only fields -->
+        <div id="signupExtra">
+          <div class="input-wrap" style="margin-bottom:10px">
+            <div class="input-inner">
+              <span class="input-icon">🪪</span>
+              <input id="authLicense" type="text" placeholder="License number (e.g. TN-0123456789)">
+            </div>
+          </div>
+          <div class="input-wrap">
+            <div class="input-inner">
+              <span class="input-icon">🚑</span>
+              <input id="authPlate" type="text" placeholder="Ambulance plate (e.g. TN09AX4471)">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="authBtn" onclick="handleAuth()">
+        <span id="authBtnIcon">🔑</span>
+        <span id="authBtnLabel">LOGIN</span>
+      </button>
+    </div>
+
+    <!-- ── View: Driver Dashboard ── -->
+    <div class="sheet-view" id="viewDriver">
+      <!-- Driver card -->
+      <div class="driver-header">
+        <div class="driver-avatar">🚑</div>
+        <div style="flex:1; min-width:0">
+          <div class="driver-name" id="driverPhone">—</div>
+          <div class="driver-plate" id="driverPlate">—</div>
+        </div>
+        <button class="btn-link" onclick="logout()">Logout</button>
+      </div>
+
+      <!-- Online toggle -->
+      <div class="online-toggle-wrap" id="onlineToggle" onclick="toggleOnline()">
+        <div class="online-label">
+          <div class="online-dot"></div>
+          <div>
+            <div class="online-text" id="onlineText">Go Online</div>
+            <div style="font-size:11px;color:var(--muted)" id="onlineSubtext">Tap to start accepting dispatches</div>
+          </div>
+        </div>
+        <div class="toggle-pill"></div>
+      </div>
+
+      <!-- ── Demo GPS Location Override ──────────────────────────────────── -->
+      <div class="demo-loc-panel">
+        <div class="demo-loc-header" onclick="this.parentElement.classList.toggle('open')">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:14px">📍</span>
+            <div>
+              <div style="font-size:12px;font-weight:600;color:var(--text)">Location Override</div>
+              <div style="font-size:10px;color:var(--muted)" id="locCoordLabel">13.08360, 80.23670</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="gps-badge" id="gpsBadge">🟡 DEMO</span>
+            <span style="font-size:10px;color:var(--muted)">▾</span>
+          </div>
+        </div>
+        <div class="demo-loc-rows" id="demoPanelRows">
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+            <select id="demoPresetSel" class="demo-select" onchange="setDemoLocation(parseInt(this.value))">
+              <option value="0">Kilpauk Medical College</option>
+              <option value="1">Poonamallee High Rd</option>
+              <option value="2">Anna Nagar East</option>
+              <option value="3">Chetpet</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <div class="demo-coord-wrap">
+              <span class="demo-coord-label">Lat</span>
+              <input id="demoLatInput" class="demo-coord-input" type="number" step="0.00001" value="13.08360">
+            </div>
+            <div class="demo-coord-wrap">
+              <span class="demo-coord-label">Lng</span>
+              <input id="demoLngInput" class="demo-coord-input" type="number" step="0.00001" value="80.23670">
+            </div>
+            <button class="demo-apply-btn" onclick="applyCustomLocation()">Apply</button>
+          </div>
+          <button id="demoGpsToggle" class="demo-gps-toggle" onclick="toggleDemoGps()">Use Real GPS</button>
+        </div>
+      </div>
+
+      <!-- ── Lower section: hospital list + dispatch button ── -->
+      <!-- On desktop this div is hidden during dispatch; on mobile the whole
+           viewDriver sheet-view is hidden by showView('viewDispatch') instead. -->
+      <div id="driverContent">
+        <div class="section-label">Select Destination Hospital</div>
+        <div class="hosp-search-wrap">
+          <span class="hosp-search-icon">🔍</span>
+          <input id="hospSearch" type="text" placeholder="Search Kilpauk hospitals…" oninput="filterHospitals(this.value)">
+        </div>
+        <div class="hosp-list" id="hospList">
+          <div style="text-align:center; padding:20px; color:var(--muted); font-size:13px">Loading hospitals…</div>
+        </div>
+        <button class="btn-primary" id="dispatchBtn" onclick="handleDispatch()" disabled>
+          <span id="dispatchIcon">🚨</span>
+          <span id="dispatchLabel">DISPATCH</span>
+        </button>
+      </div>
+
+      <!-- ── Desktop-inline dispatch / ETA card ── -->
+      <!-- Shown instead of #driverContent on desktop during an active dispatch.
+           On mobile this node stays hidden; the mobile path uses #viewDispatch. -->
+      <div id="dispatchCard">
+        <div class="eta-header">
+          <div class="eta-icon">🚑</div>
+          <div style="min-width:0">
+            <div class="eta-title">Corridor Clearing</div>
+            <div class="eta-hospital" id="etaHospital">—</div>
+          </div>
+        </div>
+
+        <div class="progress-track">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <div class="eta-stats">
+          <div class="eta-stat">
+            <div class="eta-stat-label">Distance</div>
+            <div class="eta-stat-value teal" id="etaDist">—</div>
+          </div>
+          <div class="eta-stat">
+            <div class="eta-stat-label">ETA</div>
+            <div class="eta-stat-value amber" id="etaTime">—</div>
+          </div>
+          <div class="eta-stat">
+            <div class="eta-stat-label">TLS Green</div>
+            <div class="eta-stat-value green" id="etaTls">—</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-label" style="margin-bottom:6px">Route edges</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); word-break:break-all; line-height:1.6" id="etaEdges">—</div>
+        </div>
+
+        <div id="tlsRow" style="display:none">
+          <div class="section-label" style="margin-bottom:6px">TLS junctions</div>
+          <div class="tls-row" id="tlsBadges"></div>
+        </div>
+
+        <button class="btn-cancel" onclick="finishDispatch()">✓ Mark Complete</button>
+      </div>
+    </div>
+
+    <!-- ── View: Active Dispatch (mobile-only) ── -->
+    <!-- On desktop this view is never activated; #dispatchCard inside viewDriver
+         is used instead so the persistent sidebar chrome stays visible. -->
+    <div class="sheet-view" id="viewDispatch">
+      <div id="dispatchView">
+        <div class="eta-header">
+          <div class="eta-icon">🚑</div>
+          <div style="min-width:0">
+            <div class="eta-title">Corridor Clearing</div>
+            <div class="eta-hospital" id="etaHospitalMobile">—</div>
+          </div>
+        </div>
+
+        <div class="progress-track">
+          <div class="progress-bar" id="progressBarMobile"></div>
+        </div>
+
+        <div class="eta-stats">
+          <div class="eta-stat">
+            <div class="eta-stat-label">Distance</div>
+            <div class="eta-stat-value teal" id="etaDistMobile">—</div>
+          </div>
+          <div class="eta-stat">
+            <div class="eta-stat-label">ETA</div>
+            <div class="eta-stat-value amber" id="etaTimeMobile">—</div>
+          </div>
+          <div class="eta-stat">
+            <div class="eta-stat-label">TLS Green</div>
+            <div class="eta-stat-value green" id="etaTlsMobile">—</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-label" style="margin-bottom:6px">Route edges</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); word-break:break-all; line-height:1.6" id="etaEdgesMobile">—</div>
+        </div>
+
+        <div id="tlsRowMobile" style="display:none">
+          <div class="section-label" style="margin-bottom:6px">TLS junctions</div>
+          <div class="tls-row" id="tlsBadgesMobile"></div>
+        </div>
+
+        <button class="btn-cancel" onclick="finishDispatch()">✓ Mark Complete</button>
+      </div>
+    </div>
+
+  </div><!-- /sheet-body -->
+</div><!-- /sheet -->
+
+</div><!-- /app-wrap -->
+
+<!-- Toast — outside layout so z-index always works -->
+<div id="toast" role="alert">
+  <span class="toast-icon" id="toastIcon">ℹ️</span>
+  <span class="toast-msg"  id="toastMsg"></span>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+'use strict';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants & State
+// ─────────────────────────────────────────────────────────────────────────────
+const API       = '';           // same origin
+const TOKEN_KEY = 'siren_token';
+const ME_KEY    = 'siren_me';
+
+/** Returns true when the viewport is wide enough for desktop sidebar layout */
+const isDesktop = () => window.matchMedia('(min-width: 769px)').matches;
+
+// ── Demo GPS presets (Kilpauk area) ──────────────────────────────────────────
+const DEMO_PRESETS = [
+  { label: 'Kilpauk Medical College',  lat: 13.0836, lng: 80.2367 },
+  { label: 'Poonamallee High Rd',      lat: 13.0787, lng: 80.2455 },
+  { label: 'Anna Nagar East',          lat: 13.0790, lng: 80.2270 },
+  { label: 'Chetpet',                  lat: 13.0735, lng: 80.2360 },
+];
+const KILPAUK = [DEMO_PRESETS[0].lat, DEMO_PRESETS[0].lng]; // map default
+
+let state = {
+  token:          localStorage.getItem(TOKEN_KEY) || null,
+  me:             JSON.parse(localStorage.getItem(ME_KEY) || 'null'),
+  hospitals:      [],
+  filtered:       [],
+  selectedHospId: null,
+  isOnline:       false,
+  dispatching:    false,
+  lat:            KILPAUK[0],
+  lng:            KILPAUK[1],
+  demoGps:        true,   // ON by default — use preset instead of browser GPS
+  authMode:       'login',  // 'login' | 'signup'
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Map Setup
+// ─────────────────────────────────────────────────────────────────────────────
+const map = L.map('map', {
+  center: KILPAUK,
+  zoom: 15,
+  zoomControl: false,
+  attributionControl: false,
+});
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+}).addTo(map);
+
+// Pulsing driver marker (custom HTML icon)
+function makePulseIcon(color = '#22D9C0') {
+  return L.divIcon({
+    className: '',
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    html: `
+      <div style="position:relative;width:40px;height:40px;display:flex;align-items:center;justify-content:center">
+        <div style="
+          position:absolute; width:40px; height:40px; border-radius:50%;
+          background:${color}; opacity:.18;
+          animation:pulse-ring 1.8s cubic-bezier(0.215,0.610,0.355,1.000) infinite;
+        "></div>
+        <div style="
+          width:14px;height:14px;border-radius:50%;
+          background:${color}; border:2px solid #fff;
+          box-shadow:0 0 10px ${color};
+        "></div>
+      </div>`,
+  });
+}
+
+const driverMarker = L.marker(KILPAUK, { icon: makePulseIcon(), zIndexOffset: 1000 }).addTo(map);
+let hospitalMarker  = null;
+let routeLayer      = null;
+let routeGlowLayer  = null;   // shadow glow — stored so finishDispatch can remove it
+let hospitalMarkers = [];
+
+// Active-dispatch interval handles — stored at module scope so finishDispatch() can cancel them
+let _dashAnimId  = null;   // dash-offset animation (straight-line fallback)
+let _moveIntId   = null;   // (unused — kept as guard slot, replaced by rAF)
+let _progIntId   = null;   // progress-bar interval
+let _pollIntId   = null;   // backend dispatch-status + completion polling
+let _stepPollId  = null;   // (kept for cleanup guard — TLS now time-driven)
+let _rafId       = null;   // requestAnimationFrame handle for ambulance movement
+
+// TLS signal marker state
+// Each entry: { marker, junction_id, eta_seconds, green_end_s, mstate }
+let _tlsMarkers  = [];
+
+// Separate moving ambulance marker (the driver GPS dot never moves during dispatch)
+let ambMarker    = null;
+
+// Hospital map icon
+const hospIcon = L.divIcon({
+  className: '',
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  html: `<div style="
+    width:32px;height:32px;border-radius:50% 50% 50% 0;
+    background:#FF4757;transform:rotate(-45deg);
+    border:2px solid #fff;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 2px 8px rgba(255,71,87,.5)">
+    <span style="transform:rotate(45deg);font-size:14px">🏥</span>
+  </div>`,
+});
+
+// ── TLS signal marker helpers ─────────────────────────────────────────────────
+
+/** Build a Leaflet divIcon for a TLS junction in the given visual state. */
+function makeTlsIcon(tstate, jid) {
+  return L.divIcon({
+    className: '',
+    iconSize:   [28, 28],
+    iconAnchor: [14, 14],
+    html: `<div class="tls-marker ${tstate}" title="TLS ${jid}"><div class="tls-dot"></div></div>`,
+  });
+}
+
+/** Dedicated moving ambulance icon (distinct from the driver GPS dot). */
+function makeAmbIcon() {
+  return L.divIcon({
+    className: '',
+    iconSize:   [34, 34],
+    iconAnchor: [17, 17],
+    html: '<div class="amb-icon">🚑</div>',
+  });
+}
+
+/**
+ * Fetch real-world positions for all TLS junctions in tls_schedule, place
+ * red signal markers on the map, and start the step-sync polling loop that
+ * turns each marker green as the ambulance approaches.
+ *
+ * @param {Array}  tlsSchedule  - tls_schedule from the /dispatch response
+ * @param {string} authToken    - Bearer token for /sim/status
+ */
+/**
+ * Fetch real-world positions for all TLS junctions in tls_schedule, place
+ * red signal markers on the map.  Colour changes are driven purely by
+ * wall-clock time from animStart relative to each entry's eta_seconds —
+ * no TraCI poll needed (the sim runs synchronously before the response arrives).
+ *
+ * @param {Array}  tlsSchedule  - tls_schedule from the /dispatch response
+ * @param {number} animStart    - performance.now() value at animation start
+ * @param {number} etaSeconds   - total route duration (distance_m / 13.889 m/s)
+ */
+async function placeTlsMarkers(tlsSchedule, animStart, etaSeconds) {
+  _removeTlsMarkers();
+  if (_stepPollId !== null) { clearInterval(_stepPollId); _stepPollId = null; }
+
+  if (!tlsSchedule || tlsSchedule.length === 0) return;
+
+  // ── 1. Resolve junction IDs → WGS84 ──────────────────────────────────
+  const junctionIds = tlsSchedule.map(t => t.junction_id);
+  let positions = {};
+  try {
+    const geoResp = await fetch(
+      `/route/junctions?ids=${encodeURIComponent(junctionIds.join(','))}`,
+    );
+    if (geoResp.ok) {
+      const geoData = await geoResp.json();
+      positions = geoData.positions || {};
+      if (geoData.missing?.length)
+        console.warn('TLS junctions not in net.xml:', geoData.missing);
+    }
+  } catch (e) {
+    console.warn('Could not fetch junction positions:', e.message);
+  }
+
+  // ── 2. Place markers and record timing info ───────────────────────────
+  //
+  // eta_seconds in the response = time for ambulance to reach this junction
+  //   (distance_to_junction / 13.889 m/s, same formula as the backend).
+  // The signal goes green PRE_GREEN_BUFFER (10 s) before the ambulance arrives,
+  // so green onset = eta_seconds - 10, clamped to ≥ 0.
+  // Signal stays green for ~15 s after onset, then turns blue ("passed").
+  const PRE_GREEN_S = 10;    // must match backend PRE_GREEN_BUFFER
+  const GREEN_DUR_S = 15;    // visual green window
+
+  for (const entry of tlsSchedule) {
+    const latlng = positions[entry.junction_id];
+    if (!latlng) continue;
+
+    const greenOnset  = Math.max(0, entry.eta_seconds - PRE_GREEN_S);
+    const greenEnd    = greenOnset + GREEN_DUR_S;
+
+    const marker = L.marker(latlng, {
+      icon: makeTlsIcon('red', entry.junction_id),
+      zIndexOffset: 500,
+    });
+    marker.bindTooltip(
+      `🚦 ${entry.junction_id}<br>🔴 Red — green in ~${Math.round(greenOnset)}s`,
+      { direction: 'top', offset: [0, -16] },
+    );
+    marker.addTo(map);
+
+    _tlsMarkers.push({
+      marker,
+      junction_id: entry.junction_id,
+      greenOnset,
+      greenEnd,
+      mstate: 'red',
+    });
+  }
+
+  if (_tlsMarkers.length === 0) return;
+
+  // ── 3. Time-driven colour update loop (rAF-aligned, 100 ms checks) ───────
+  // Elapsed seconds since animation started.  Stops when all signals are
+  // "passed" or when the dispatch ends (state.dispatching = false).
+  _stepPollId = setInterval(() => {
+    if (!state.dispatching) { clearInterval(_stepPollId); _stepPollId = null; return; }
+    const elapsedS = (performance.now() - animStart) / 1000;
+
+    for (const entry of _tlsMarkers) {
+      const desired =
+        elapsedS >= entry.greenOnset && elapsedS < entry.greenEnd ? 'green'
+        : elapsedS >= entry.greenEnd ? 'passed'
+        : 'red';
+
+      if (desired !== entry.mstate) {
+        entry.mstate = desired;
+        entry.marker.setIcon(makeTlsIcon(desired, entry.junction_id));
+        entry.marker.setTooltipContent(
+          `🚦 ${entry.junction_id}<br>` + (
+            desired === 'green' ? '🟢 <b>GREEN — Corridor clear</b>'
+            : desired === 'passed' ? '✅ Passed'
+            : `🔴 Red — green in ~${Math.round(Math.max(0, entry.greenOnset - elapsedS))}s`
+          ),
+        );
+      }
+    }
+
+    // Stop polling once every marker has been passed
+    if (_tlsMarkers.every(e => e.mstate === 'passed')) {
+      clearInterval(_stepPollId); _stepPollId = null;
+    }
+  }, 100);   // 100 ms — smooth transitions, negligible CPU
+}
+
+// FAB controls
+document.getElementById('fabLocate').onclick = () => {
+  map.flyTo([state.lat, state.lng], 16, { animate: true, duration: 1 });
+};
+document.getElementById('fabZoomIn').onclick = () => map.zoomIn();
+document.getElementById('fabZoomOut').onclick = () => map.zoomOut();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GPS / Location
+// ─────────────────────────────────────────────────────────────────────────────
+let _gpsWatchId = null;
+
+function startGPS() {
+  if (state.demoGps) return;  // demo mode active — skip real GPS
+  if (!navigator.geolocation) {
+    toast('Geolocation not available — demo location active.', 'info');
+    return;
+  }
+  _gpsWatchId = navigator.geolocation.watchPosition(
+    pos => {
+      state.lat = pos.coords.latitude;
+      state.lng = pos.coords.longitude;
+      driverMarker.setLatLng([state.lat, state.lng]);
+      updateLocLabel();
+      renderHospitalList(state.filtered); // refresh distances
+    },
+    () => { toast('GPS unavailable — demo location active.', 'info'); },
+    { enableHighAccuracy: true, maximumAge: 5000 }
+  );
+}
+
+function stopGPS() {
+  if (_gpsWatchId !== null && navigator.geolocation) {
+    navigator.geolocation.clearWatch(_gpsWatchId);
+    _gpsWatchId = null;
+  }
+}
+
+/** Apply a demo preset by index */
+function setDemoLocation(idx) {
+  const p = DEMO_PRESETS[idx];
+  if (!p) return;
+  state.lat = p.lat;
+  state.lng = p.lng;
+  driverMarker.setLatLng([state.lat, state.lng]);
+  map.flyTo([state.lat, state.lng], 15, { animate: true, duration: 0.8 });
+  updateLocLabel();
+  renderHospitalList(state.filtered);
+  // Update preset selector
+  const sel = document.getElementById('demoPresetSel');
+  if (sel) sel.value = String(idx);
+  // Update custom fields
+  const latEl = document.getElementById('demoLatInput');
+  const lngEl = document.getElementById('demoLngInput');
+  if (latEl) latEl.value = p.lat.toFixed(5);
+  if (lngEl) lngEl.value = p.lng.toFixed(5);
+}
+
+/** Apply custom lat/lng typed by user */
+function applyCustomLocation() {
+  const lat = parseFloat(document.getElementById('demoLatInput').value);
+  const lng = parseFloat(document.getElementById('demoLngInput').value);
+  if (isNaN(lat) || isNaN(lng)) { toast('Invalid coordinates.', 'error'); return; }
+  state.lat = lat;
+  state.lng = lng;
+  driverMarker.setLatLng([state.lat, state.lng]);
+  map.flyTo([state.lat, state.lng], 15, { animate: true, duration: 0.8 });
+  updateLocLabel();
+  renderHospitalList(state.filtered);
+  document.getElementById('demoPresetSel').value = '';
+  toast(`📍 Location set: ${lat.toFixed(5)}, ${lng.toFixed(5)}`, 'success', 2500);
+}
+
+/** Toggle between demo GPS and real browser GPS */
+function toggleDemoGps() {
+  state.demoGps = !state.demoGps;
+  const row   = document.getElementById('demoPanelRows');
+  const badge = document.getElementById('gpsBadge');
+  const btn   = document.getElementById('demoGpsToggle');
+  if (state.demoGps) {
+    stopGPS();
+    row.style.display   = '';
+    badge.textContent   = '🟡 DEMO';
+    btn.textContent     = 'Use Real GPS';
+    setDemoLocation(parseInt(document.getElementById('demoPresetSel').value) || 0);
+  } else {
+    row.style.display   = 'none';
+    badge.textContent   = '🟢 REAL GPS';
+    btn.textContent     = 'Use Demo Location';
+    startGPS();
+    toast('📡 Switched to real browser GPS', 'info');
+  }
+}
+
+function updateLocLabel() {
+  const el = document.getElementById('locCoordLabel');
+  if (el) el.textContent = `${state.lat.toFixed(5)}, ${state.lng.toFixed(5)}`;
+}
+
+// Initialise: demo mode ON by default
+setDemoLocation(0);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Toast
+// ─────────────────────────────────────────────────────────────────────────────
+let toastTimer = null;
+function toast(msg, type = 'info', duration = 3500) {
+  const el   = document.getElementById('toast');
+  const icon = document.getElementById('toastIcon');
+  const txt  = document.getElementById('toastMsg');
+  icon.textContent = type === 'error' ? '⚠️' : type === 'success' ? '✅' : 'ℹ️';
+  txt.textContent  = msg;
+  el.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, duration);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bottom Sheet drag
+// ─────────────────────────────────────────────────────────────────────────────
+const sheet  = document.getElementById('sheet');
+const handle = document.getElementById('sheetHandle');
+let dragStart = null, sheetStart = 0, isDragging = false;
+
+function getSheetTranslate() {
+  const m = new DOMMatrix(getComputedStyle(sheet).transform);
+  return m.m42;
+}
+
+handle.addEventListener('pointerdown', e => {
+  isDragging = true;
+  dragStart  = e.clientY;
+  sheetStart = getSheetTranslate();
+  handle.setPointerCapture(e.pointerId);
+});
+
+handle.addEventListener('pointermove', e => {
+  if (!isDragging || isDesktop()) return;
+  const dy   = e.clientY - dragStart;
+  const newY = Math.max(0, Math.min(sheetStart + dy, parseFloat(getComputedStyle(sheet).height) - 60));
+  sheet.style.transition = 'none';
+  sheet.style.transform  = `translateY(${newY}px)`;
+});
+
+handle.addEventListener('pointerup', e => {
+  if (!isDragging) return;
+  isDragging = false;
+  if (isDesktop()) return;
+  sheet.style.transition = '';
+  const cur  = getSheetTranslate();
+  const h    = parseFloat(getComputedStyle(sheet).height);
+  if (cur < h * 0.45) {
+    sheet.classList.add('expanded');
+    sheet.style.transform = '';
+  } else {
+    sheet.classList.remove('expanded');
+    sheet.style.transform = '';
+  }
+});
+
+// Tap handle to toggle (mobile only)
+handle.addEventListener('click', () => {
+  if (isDragging || isDesktop()) return;
+  sheet.classList.toggle('expanded');
+});
+
+// Invalidate Leaflet map size when layout changes across the breakpoint
+window.addEventListener('resize', () => {
+  if (typeof map !== 'undefined') map.invalidateSize();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auth tab switching
+// ─────────────────────────────────────────────────────────────────────────────
+function switchAuthTab(mode) {
+  state.authMode = mode;
+  document.getElementById('tabLogin').classList.toggle('active',  mode === 'login');
+  document.getElementById('tabSignup').classList.toggle('active', mode === 'signup');
+  document.getElementById('signupExtra').classList.toggle('visible', mode === 'signup');
+  document.getElementById('authBtnLabel').textContent = mode === 'login' ? 'LOGIN' : 'CREATE ACCOUNT';
+  document.getElementById('authBtnIcon').textContent  = mode === 'login' ? '🔑' : '📝';
+  document.getElementById('authPassword').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auth
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleAuth() {
+  const phone    = document.getElementById('authPhone').value.trim();
+  const password = document.getElementById('authPassword').value;
+  if (!phone || !password) { toast('Please fill in all fields.', 'error'); return; }
+
+  const btn   = document.getElementById('authBtn');
+  const label = document.getElementById('authBtnLabel');
+  const icon  = document.getElementById('authBtnIcon');
+
+  btn.disabled = true;
+  icon.outerHTML = '<div class="spinner" id="authBtnIcon"></div>';
+  label.textContent = state.authMode === 'login' ? 'LOGGING IN…' : 'CREATING…';
+
+  try {
+    if (state.authMode === 'signup') {
+      const license = document.getElementById('authLicense').value.trim();
+      const plate   = document.getElementById('authPlate').value.trim();
+      if (!license || !plate) { toast('Fill in license & plate number.', 'error'); return; }
+
+      const sr = await fetch(`${API}/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number: phone, password, license_number: license, ambulance_plate: plate }),
+      });
+      const sd = await sr.json();
+      if (!sr.ok) { toast(sd.detail || 'Signup failed.', 'error'); return; }
+      toast(`Account created! Now log in.`, 'success');
+      switchAuthTab('login');
+      return;
+    }
+
+    // Login
+    const lr = await fetch(`${API}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone_number: phone, password }),
+    });
+    const ld = await lr.json();
+    if (!lr.ok) { toast(ld.detail || 'Login failed.', 'error'); return; }
+
+    state.token = ld.access_token;
+    localStorage.setItem(TOKEN_KEY, state.token);
+
+    // Fetch profile
+    await fetchMe();
+    showDriverView();
+    loadHospitals();
+    if (!isDesktop()) sheet.classList.add('expanded');
+
+  } catch (e) {
+    toast('Network error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    const sp = btn.querySelector('.spinner');
+    if (sp) { const s = document.createElement('span'); s.id='authBtnIcon'; s.textContent=state.authMode==='login'?'🔑':'📝'; sp.replaceWith(s); }
+    label.textContent = state.authMode === 'login' ? 'LOGIN' : 'CREATE ACCOUNT';
+  }
+}
+
+async function fetchMe() {
+  if (!state.token) return;
+  try {
+    const r = await fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${state.token}` } });
+    if (!r.ok) { if (r.status === 401) logout(); return; }
+    state.me = await r.json();
+    localStorage.setItem(ME_KEY, JSON.stringify(state.me));
+    state.isOnline = state.me.is_online;
+  } catch { /* offline */ }
+}
+
+function logout() {
+  state.token    = null;
+  state.me       = null;
+  state.isOnline = false;
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(ME_KEY);
+  showAuthView();
+  if (!isDesktop()) sheet.classList.add('expanded');
+  toast('Logged out.', 'info');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Online toggle
+// ─────────────────────────────────────────────────────────────────────────────
+async function toggleOnline() {
+  if (!state.token) return;
+  const newState = !state.isOnline;
+  try {
+    const r = await fetch(`${API}/auth/me/online`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}` },
+      body: JSON.stringify({ is_online: newState, lat: state.lat, lng: state.lng }),
+    });
+    if (!r.ok) { toast('Could not update status.', 'error'); return; }
+    state.isOnline = newState;
+    renderOnlineState();
+    toast(newState ? '✅ You are now online' : 'You are offline', newState ? 'success' : 'info');
+  } catch { toast('Network error.', 'error'); }
+}
+
+function renderOnlineState() {
+  const wrap = document.getElementById('onlineToggle');
+  const txt  = document.getElementById('onlineText');
+  const sub  = document.getElementById('onlineSubtext');
+  wrap.classList.toggle('online', state.isOnline);
+  txt.textContent = state.isOnline ? 'Online' : 'Go Online';
+  sub.textContent = state.isOnline ? 'Ready for dispatches' : 'Tap to start accepting dispatches';
+  const dispBtn = document.getElementById('dispatchBtn');
+  if (dispBtn) dispBtn.disabled = !(state.isOnline && state.selectedHospId);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Hospitals
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadHospitals() {
+  const list = document.getElementById('hospList');
+  try {
+    const r = await fetch(`${API}/hospitals`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    state.hospitals = await r.json();
+    state.filtered  = state.hospitals;
+
+    // Add hospital markers to map (clustered appearance)
+    hospitalMarkers.forEach(m => map.removeLayer(m));
+    hospitalMarkers = [];
+    state.hospitals.forEach(h => {
+      const m = L.marker([h.lat, h.lng], { icon: hospIcon, opacity: 0.5 })
+        .bindTooltip(h.name, { permanent: false, direction: 'top', offset: [0, -28] });
+      m.on('click', () => selectHospital(h.id));
+      m.addTo(map);
+      hospitalMarkers.push(m);
+    });
+
+    renderHospitalList(state.hospitals);
+  } catch(e) {
+    list.innerHTML = `<div style="text-align:center;padding:20px;color:var(--red);font-size:13px">Failed to load hospitals</div>`;
+    console.error(e);
+  }
+}
+
+function filterHospitals(query) {
+  const q = query.toLowerCase().trim();
+  state.filtered = q
+    ? state.hospitals.filter(h => h.name.toLowerCase().includes(q))
+    : state.hospitals;
+  renderHospitalList(state.filtered);
+}
+
+function renderHospitalList(hospitals) {
+  const list = document.getElementById('hospList');
+  if (!hospitals.length) {
+    list.innerHTML = `<div style="text-align:center;padding:14px;color:var(--muted);font-size:13px">No hospitals found</div>`;
+    return;
+  }
+  list.innerHTML = hospitals.map(h => {
+    const dist = haversine(state.lat, state.lng, h.lat, h.lng);
+    const sel  = h.id === state.selectedHospId;
+    return `<div class="hosp-item ${sel ? 'selected' : ''}" onclick="selectHospital(${h.id})" data-id="${h.id}">
+      <div class="hosp-item-icon">🏥</div>
+      <div class="hosp-item-name">${escHtml(h.name)}</div>
+      <div class="hosp-item-dist">${fmtDist(dist)}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectHospital(id) {
+  state.selectedHospId = id;
+  const h = state.hospitals.find(x => x.id === id);
+  if (!h) return;
+
+  // Update list highlight
+  document.querySelectorAll('.hosp-item').forEach(el => {
+    el.classList.toggle('selected', parseInt(el.dataset.id) === id);
+  });
+
+  // Move/zoom to hospital on map
+  if (hospitalMarker) map.removeLayer(hospitalMarker);
+  hospitalMarker = L.marker([h.lat, h.lng], { icon: hospIcon })
+    .addTo(map)
+    .bindPopup(`<strong>${h.name}</strong>`, { closeButton: false })
+    .openPopup();
+  map.flyTo([h.lat, h.lng], 16, { animate: true, duration: 1 });
+
+  // Enable dispatch
+  const btn = document.getElementById('dispatchBtn');
+  if (btn) btn.disabled = !(state.isOnline);
+  document.getElementById('dispatchLabel').textContent = `DISPATCH → ${h.name.split(' ').slice(0,2).join(' ')}`;
+  document.getElementById('dispatchIcon').textContent  = '🚨';
+
+  // Clear old route
+  if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+  renderHospitalList(state.filtered);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dispatch
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleDispatch() {
+  if (!state.selectedHospId || !state.token) {
+    toast('Select a hospital and log in first.', 'error'); return;
+  }
+  if (!state.isOnline) { toast('Go online first.', 'error'); return; }
+
+  const btn   = document.getElementById('dispatchBtn');
+  const label = document.getElementById('dispatchLabel');
+  const icon  = document.getElementById('dispatchIcon');
+
+  btn.disabled = true;
+  icon.outerHTML = '<div class="spinner" id="dispatchIcon"></div>';
+  label.textContent = 'ROUTING…';
+
+  try {
+    const r = await fetch(`${API}/dispatch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${state.token}`,
+      },
+      body: JSON.stringify({
+        dest_hospital_id: state.selectedHospId,
+        start_lat: state.lat,
+        start_lng: state.lng,
+      }),
+    });
+    const data = await r.json();
+
+    if (!r.ok) {
+      const msg = typeof data.detail === 'string' ? data.detail
+        : typeof data.detail === 'object' ? (data.detail.reason || JSON.stringify(data.detail))
+        : `HTTP ${r.status}`;
+      toast(msg, 'error');
+      return;
+    }
+
+    state.dispatching = true;
+    showDispatchView(data);
+    animateRoute(data);
+    // Mobile only: shift the sheet peek height
+    if (!isDesktop()) {
+      sheet.classList.add('dispatching');
+      sheet.classList.remove('expanded');
+    }
+    document.getElementById('dispatchingBadge').style.display = 'flex';
+    const sidebarBadge = document.getElementById('dispatchingBadgeSidebar');
+    if (sidebarBadge) sidebarBadge.style.display = '';
+
+  } catch(e) {
+    toast('Network error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    const sp = btn.querySelector('.spinner');
+    if (sp) { const s = document.createElement('span'); s.id='dispatchIcon'; s.textContent='🚨'; sp.replaceWith(s); }
+    label.textContent = 'DISPATCH';
+  }
+}
+
+function showDispatchView(data) {
+  const hosp  = state.hospitals.find(h => h.id === state.selectedHospId);
+  const hospName  = data.hospital_name || hosp?.name || '—';
+  const distTxt   = fmtDistVal(data.distance_m);
+  const etaTxt    = fmtEta(data.distance_m);
+  const tlsCount  = String((data.tls_schedule || []).length);
+  const edges     = data.route_edges || [];
+  const edgesTxt  = edges.length
+    ? edges.slice(0, 6).join(' → ') + (edges.length > 6 ? ` … +${edges.length - 6} more` : '')
+    : '—';
+  const tls = data.tls_schedule || [];
+
+  if (isDesktop()) {
+    // ── Desktop: stay in viewDriver, swap #driverContent ↔ #dispatchCard ──
+    const viewDriver = document.getElementById('viewDriver');
+    viewDriver.classList.add('dispatching-desktop');
+
+    document.getElementById('etaHospital').textContent = hospName;
+    document.getElementById('etaDist').textContent     = distTxt;
+    document.getElementById('etaTime').textContent     = etaTxt;
+    document.getElementById('etaTls').textContent      = tlsCount;
+    document.getElementById('etaEdges').textContent    = edgesTxt;
+    if (tls.length) {
+      document.getElementById('tlsRow').style.display  = 'block';
+      document.getElementById('tlsBadges').innerHTML   = tls.map(t =>
+        `<span class="tls-badge">${t.junction_id} (${Math.round(t.distance_m)}m)</span>`
+      ).join('');
+    }
+  } else {
+    // ── Mobile: full-page view swap ───────────────────────────────────────
+    showView('viewDispatch');
+
+    document.getElementById('etaHospitalMobile').textContent = hospName;
+    document.getElementById('etaDistMobile').textContent     = distTxt;
+    document.getElementById('etaTimeMobile').textContent     = etaTxt;
+    document.getElementById('etaTlsMobile').textContent      = tlsCount;
+    document.getElementById('etaEdgesMobile').textContent    = edgesTxt;
+    if (tls.length) {
+      document.getElementById('tlsRowMobile').style.display  = 'block';
+      document.getElementById('tlsBadgesMobile').innerHTML   = tls.map(t =>
+        `<span class="tls-badge">${t.junction_id} (${Math.round(t.distance_m)}m)</span>`
+      ).join('');
+    }
+  }
+
+  // Animate progress bar — same element ids used on both paths
+  const progBarId = isDesktop() ? 'progressBar' : 'progressBarMobile';
+  let pct = 0;
+  const progBar = document.getElementById(progBarId);
+  if (_progIntId !== null) { clearInterval(_progIntId); _progIntId = null; }
+  _progIntId = setInterval(() => {
+    pct = Math.min(pct + 1.5, data.completed ? 100 : 85);
+    progBar.style.width = pct + '%';
+    if (pct >= 100) { clearInterval(_progIntId); _progIntId = null; }
+  }, 200);
+}
+
+async function animateRoute(data) {
+  // Cancel any leftover intervals/rAF from a previous dispatch
+  _clearDispatchIntervals();
+  _removeTlsMarkers();
+  if (ambMarker) { map.removeLayer(ambMarker); ambMarker = null; }
+
+  if (routeLayer)     { map.removeLayer(routeLayer);     routeLayer     = null; }
+  if (routeGlowLayer) { map.removeLayer(routeGlowLayer); routeGlowLayer = null; }
+  if (hospitalMarker) { map.removeLayer(hospitalMarker); hospitalMarker = null; }
+
+  const hosp = state.hospitals.find(h => h.id === state.selectedHospId);
+  if (!hosp) return;
+
+  // ── 1. Fetch real street polyline ─────────────────────────────────────────────────
+  const edges = data.route_edges || [];
+  let coords = null;
+
+  if (edges.length > 0) {
+    try {
+      const geoResp = await fetch(
+        `/route/geometry?edges=${encodeURIComponent(edges.join(','))}&max_edges=300`,
+      );
+      if (geoResp.ok) {
+        const geoData = await geoResp.json();
+        if (geoData.coordinates?.length >= 2) coords = geoData.coordinates;
+      } else {
+        console.warn('route/geometry', geoResp.status, '— straight-line fallback');
+      }
+    } catch (e) {
+      console.warn('route/geometry fetch failed:', e.message, '— straight-line fallback');
+    }
+  }
+
+  // ── 2. Fallback: straight line ────────────────────────────────────────────────
+  const isStraightLine = !coords;
+  if (isStraightLine) {
+    coords = [[state.lat, state.lng], [hosp.lat, hosp.lng]];
+    toast('⚠ Route drawn as straight line (SUMO not running)', 'info', 5000);
+  }
+
+  // ── 3. Draw route polyline ─────────────────────────────────────────────────
+  routeGlowLayer = L.polyline(coords, {
+    color: 'rgba(34,217,192,0.12)', weight: 18, lineCap: 'round', lineJoin: 'round',
+  }).addTo(map);
+  routeLayer = L.polyline(coords, {
+    color: '#22D9C0', weight: isStraightLine ? 3 : 5,
+    lineCap: 'round', lineJoin: 'round',
+    dashArray: isStraightLine ? '10, 8' : null,
+    dashOffset: '0', opacity: 0.9,
+  }).addTo(map);
+
+  if (isStraightLine) {
+    let offset = 20;
+    _dashAnimId = setInterval(() => {
+      offset -= 1.5;
+      if (routeLayer) routeLayer.setStyle({ dashOffset: String(offset) });
+      else { clearInterval(_dashAnimId); _dashAnimId = null; }
+    }, 60);
+  }
+
+  // ── 4. Build arc-length lookup table for constant-speed interpolation ───────
+  //
+  // We pre-compute the cumulative distance at each polyline vertex so the
+  // ambulance moves at constant real-world speed regardless of how densely
+  // packed the coordinate points are.
+  const segLengths = [];   // metres per segment
+  let totalLength  = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const d = haversine(coords[i][0], coords[i][1], coords[i+1][0], coords[i+1][1]);
+    segLengths.push(d);
+    totalLength += d;
+  }
+  const cumDist = [0];     // cumulative distance to vertex i
+  for (const d of segLengths) cumDist.push(cumDist[cumDist.length - 1] + d);
+
+  /**
+   * Return [lat, lng] at distance `dist` metres along the polyline.
+   * Uses binary search on the cumDist table for O(log n).
+   */
+  function posAtDist(dist) {
+    const clamped = Math.max(0, Math.min(dist, totalLength));
+    // Binary search for the segment containing `clamped`
+    let lo = 0, hi = cumDist.length - 2;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (cumDist[mid + 1] < clamped) lo = mid + 1; else hi = mid;
+    }
+    const segStart = cumDist[lo];
+    const segLen   = segLengths[lo];
+    const frac     = segLen > 0 ? (clamped - segStart) / segLen : 0;
+    return [
+      coords[lo][0] + (coords[lo + 1][0] - coords[lo][0]) * frac,
+      coords[lo][1] + (coords[lo + 1][1] - coords[lo][1]) * frac,
+    ];
+  }
+
+  // ── 5. Determine animation duration from eta_seconds ────────────────────────
+  //
+  // The backend computes eta_seconds = distance_m / 13.889 m/s for each
+  // junction.  We do the same for the full route.  This keeps the ambulance
+  // animation perfectly in sync with the TLS colour schedule.
+  const AMBULANCE_SPEED = 13.889;   // m/s — matches backend constant
+  const rawEta  = data.distance_m > 0
+    ? data.distance_m / AMBULANCE_SPEED
+    : (data.tls_schedule?.length
+        ? Math.max(...data.tls_schedule.map(t => t.eta_seconds)) + 30
+        : 60);
+  // Clamp to a reasonable visible range: at least 8 s, at most 15 min
+  const etaMs  = Math.min(Math.max(rawEta * 1000, 8000), 900_000);
+
+  // ── 6. Place moving ambulance marker ────────────────────────────────────────
+  //
+  // ambMarker travels the route.  driverMarker (the phone GPS dot) is LEFT
+  // STATIONARY — it represents where the driver physically is, not the
+  // visualised ambulance position.
+  ambMarker = L.marker(coords[0], {
+    icon:          makeAmbIcon(),
+    zIndexOffset:  1200,   // above TLS markers (500) and hospital (1000)
+  }).addTo(map);
+
+  // ── 7. rAF animation loop ───────────────────────────────────────────────────
+  const animStart = performance.now();
+
+  function rafStep(now) {
+    if (!state.dispatching) return;   // cancelled externally — stop
+
+    const elapsed = now - animStart;          // ms
+    const t       = Math.min(elapsed / etaMs, 1.0);
+    const dist    = t * totalLength;
+
+    if (ambMarker) ambMarker.setLatLng(posAtDist(dist));
+
+    if (t < 1.0) {
+      _rafId = requestAnimationFrame(rafStep);
+    } else {
+      // ── Animation complete: ambulance reached the hospital ──────────
+      _rafId = null;
+      if (ambMarker) {
+        ambMarker.setLatLng([hosp.lat, hosp.lng]);
+        ambMarker.setIcon(L.divIcon({
+          className: '', iconSize: [34, 34], iconAnchor: [17, 17],
+          html: '<div class="amb-icon" style="animation:none;background:var(--green);box-shadow:0 0 20px var(--green)">✅</div>',
+        }));
+      }
+      // Give the driver 3 seconds to see the "arrived" state, then auto-finish
+      setTimeout(() => { if (state.dispatching) finishDispatch(true); }, 3000);
+    }
+  }
+  _rafId = requestAnimationFrame(rafStep);
+
+  // ── 8. Fit map to route ───────────────────────────────────────────────────
+  map.fitBounds(L.latLngBounds(coords), { padding: [60, 60], animate: true, duration: 1 });
+
+  // ── 9. Hospital destination marker ─────────────────────────────────────────
+  hospitalMarker = L.marker([hosp.lat, hosp.lng], { icon: hospIcon })
+    .addTo(map)
+    .bindPopup(
+      `<strong>${hosp.name}</strong><br>` +
+      (isStraightLine ? '⚠ Estimated route' : `✅ Road route · ${edges.length} edges`),
+      { closeButton: false },
+    )
+    .openPopup();
+
+  // ── 10. TLS signal markers (time-driven, no TraCI poll) ─────────────────────
+  placeTlsMarkers(data.tls_schedule || [], animStart, rawEta);
+
+  // ── 11. Backend completion poll (safety net — rAF also auto-finishes) ───────
+  // This catches edge cases where the user navigates away and returns, or
+  // the server reports completion before the visual animation ends.
+  _pollIntId = setInterval(async () => {
+    if (!state.dispatching) { clearInterval(_pollIntId); _pollIntId = null; return; }
+    try {
+      const r = await fetch(`${API}/dispatch/status`, {
+        headers: { Authorization: `Bearer ${state.token}` },
+      });
+      if (!r.ok) return;
+      const d = await r.json();
+      if (d.completed === true) finishDispatch(true);
+    } catch { /* ignore */ }
+  }, 5000);
+}
+
+
+/** Remove all TLS signal markers from the map and clear the _tlsMarkers array. */
+function _removeTlsMarkers() {
+  for (const entry of _tlsMarkers) {
+    try { map.removeLayer(entry.marker); } catch { /* already removed */ }
+  }
+  _tlsMarkers = [];
+}
+
+/** Cancel every timer/interval and rAF started by the current dispatch session. */
+function _clearDispatchIntervals() {
+  if (_dashAnimId !== null) { clearInterval(_dashAnimId); _dashAnimId = null; }
+  if (_moveIntId  !== null) { clearInterval(_moveIntId);  _moveIntId  = null; }
+  if (_progIntId  !== null) { clearInterval(_progIntId);  _progIntId  = null; }
+  if (_pollIntId  !== null) { clearInterval(_pollIntId);  _pollIntId  = null; }
+  if (_stepPollId !== null) { clearInterval(_stepPollId); _stepPollId = null; }
+  if (_rafId      !== null) { cancelAnimationFrame(_rafId); _rafId    = null; }
+}
+
+/**
+ * Tear down an active dispatch.
+ * Called either by the driver tapping "Mark Complete" (auto=false)
+ * or by the backend-status poll when completed:true is returned (auto=true).
+ */
+function finishDispatch(auto = false) {
+  if (!state.dispatching) return;   // guard against double-call
+  state.dispatching = false;
+
+  // Stop all running intervals — route survives until this point
+  _clearDispatchIntervals();
+
+  // Hide EN ROUTE badges
+  document.getElementById('dispatchingBadge').style.display = 'none';
+  const sidebarBadge = document.getElementById('dispatchingBadgeSidebar');
+  if (sidebarBadge) sidebarBadge.style.display = 'none';
+
+  if (isDesktop()) {
+    // Restore #driverContent, hide #dispatchCard
+    document.getElementById('viewDriver').classList.remove('dispatching-desktop');
+    document.getElementById('progressBar').style.width = '0%';
+    // tlsRow may have been shown; reset it
+    document.getElementById('tlsRow').style.display = 'none';
+  } else {
+    // Mobile: undo sheet peek override and restore viewDriver
+    sheet.classList.remove('dispatching', 'expanded');
+    document.getElementById('progressBarMobile').style.width = '0%';
+    document.getElementById('tlsRowMobile').style.display = 'none';
+    showView('viewDriver');
+  }
+
+  // Remove map layers
+  if (routeLayer)     { map.removeLayer(routeLayer);     routeLayer     = null; }
+  if (routeGlowLayer) { map.removeLayer(routeGlowLayer); routeGlowLayer = null; }
+  if (hospitalMarker) { map.removeLayer(hospitalMarker); hospitalMarker = null; }
+  if (ambMarker)      { map.removeLayer(ambMarker);      ambMarker      = null; }
+  _removeTlsMarkers();
+
+  // Keep driverMarker at its true GPS position (it never moved during dispatch)
+  driverMarker.setLatLng([state.lat, state.lng]);
+  map.flyTo([state.lat, state.lng], 15);
+  document.getElementById('dispatchLabel').textContent = 'DISPATCH';
+  state.selectedHospId = null;
+  renderHospitalList(state.hospitals);
+  toast(auto ? '✅ Dispatch completed (confirmed by server)' : 'Dispatch complete! 🎉', 'success', 4000);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// View management
+// ─────────────────────────────────────────────────────────────────────────────
+function showView(id) {
+  document.querySelectorAll('.sheet-view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showAuthView() {
+  showView('viewAuth');
+}
+
+function showDriverView() {
+  showView('viewDriver');
+  const me = state.me;
+  if (me) {
+    document.getElementById('driverPhone').textContent = me.phone_number || '—';
+    document.getElementById('driverPlate').textContent = `${me.ambulance_plate || '—'} · ${me.license_number || '—'}`;
+    state.isOnline = me.is_online || false;
+    renderOnlineState();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Utilities
+// ─────────────────────────────────────────────────────────────────────────────
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000, dLat = rad(lat2-lat1), dLon = rad(lon2-lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+const rad = d => d * Math.PI / 180;
+
+function fmtDist(m) {
+  if (!m || m < 0) return '—';
+  return m >= 1000 ? `${(m/1000).toFixed(1)} km` : `${Math.round(m)} m`;
+}
+function fmtDistVal(m) {
+  if (!m) return '—';
+  return m >= 1000 ? `${(m/1000).toFixed(2)}km` : `${Math.round(m)}m`;
+}
+function fmtEta(distM, speedKmh = 50) {
+  if (!distM) return '—';
+  const secs = (distM / 1000) / speedKmh * 3600;
+  if (secs < 60) return `${Math.round(secs)}s`;
+  return `${Math.floor(secs/60)}m ${Math.round(secs%60)}s`;
+}
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────────────────────────────────────
+(async () => {
+  if (state.token) {
+    await fetchMe();
+    if (state.me) {
+      showDriverView();
+      loadHospitals();
+      sheet.classList.add('expanded');
+    } else {
+      showAuthView();
+    }
+  } else {
+    showAuthView();
+    sheet.classList.add('expanded');
+  }
+})();
+</script>
+</body>
+</html>
