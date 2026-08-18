@@ -55,6 +55,10 @@ AMBULANCE_ALLOWLIST: dict[str, str] = {
     "AP01AB0001": "ambulance",
     "KL07AX9999": "ambulance",
     "HR26DQ1234": "police",
+    # ── Demo plate: EasyOCR read from test_real_plates/plate4.webp ──────────
+    # Verified offline: detect_plate('demo-assets/plates/plate_demo_authorized.jpg')
+    # → plate_text='TN87C5106', confidence=0.4666  (raw_ocr='TN87 C5106')
+    "TN87C5106":  "ambulance",
 }
 
 _PLATE_RE     = re.compile(r'^[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{3,4}$')

@@ -255,23 +255,52 @@ class SumoEnv:
             logger.warning("latlon_to_edge(%s,%s) failed: %s", lat, lng, exc)
             return None
 
-    def nearest_edge(self, lat: float, lng: float, radius: float = 200.0) -> Optional[str]:
-        """
-        Return the nearest driveable SUMO edge to the given lat/lng.
+    _cached_net = None
 
-        Uses the TraCI road-position conversion with a search radius.
-        Returns None if nothing found within *radius* metres.
+    def nearest_edge(self, lat: float, lng: float, radius: float = 500.0) -> Optional[str]:
         """
-        import traci
+        Return the nearest driveable SUMO edge to the given lat/lng using sumolib.
+        
+        This accurately converts WGS84 coordinates to SUMO XY, searches within
+        the specified radius (default 500m), and filters for edges that allow
+        'emergency' or 'passenger' vehicles. This avoids snapping to pedestrian-only
+        paths or inaccessible one-ways that would cause routing to fail.
+        """
         try:
-            x, y = traci.simulation.convertGeo(lng, lat, fromGeo=True)
-            result = traci.simulation.convertRoad(x, y, isGeo=False)
-            # result is (roadID, laneIndex, posOnLane)
-            road_id = result[0]
-            return road_id if road_id and not road_id.startswith(":") else None
+            if SumoEnv._cached_net is None:
+                tools_path = str(SUMO_HOME / "tools")
+                if tools_path not in sys.path:
+                    sys.path.insert(0, tools_path)
+                import sumolib
+                logger.info("nearest_edge: loading SUMO network via sumolib...")
+                SumoEnv._cached_net = sumolib.net.readNet(str(NETWORK_FILE), withInternal=False)
+                logger.info("nearest_edge: network loaded.")
+
+            net = SumoEnv._cached_net
+            x, y = net.convertLonLat2XY(lng, lat)
+            
+            # getNeighboringEdges returns a list of (edge_obj, distance) sorted by distance
+            neighbors = net.getNeighboringEdges(x, y, r=radius, includeJunctions=False)
+            
+            # Filter for accessible edges
+            for edge, dist in sorted(neighbors, key=lambda t: t[1]):
+                if edge.getID().startswith(":"):
+                    continue
+                # Check if it allows passenger/emergency vehicles
+                # If allows() is not available, we can parse 'allow' / 'disallow' string attributes.
+                if not edge.allows("emergency") and not edge.allows("passenger"):
+                    continue
+                
+                logger.debug("nearest_edge(%s,%s) -> %r at %.1fm", lat, lng, edge.getID(), dist)
+                return edge.getID()
+
+            logger.warning("nearest_edge(%s,%s): No accessible edge found within %.1fm", lat, lng, radius)
+            return None
+
         except Exception as exc:
             logger.warning("nearest_edge(%s,%s) failed: %s", lat, lng, exc)
             return None
+
 
     # ── Properties ────────────────────────────────────────────────────────
 

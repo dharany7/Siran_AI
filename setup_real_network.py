@@ -30,10 +30,10 @@ import requests
 # ---------------------------------------------------------------------------
 # Kilpauk, Chennai — compact medical district with multiple real hospitals
 BBOX = {
-    "south": 13.070,
-    "west":  80.227,
-    "north": 13.097,
-    "east":  80.253,
+    "south": 13.0654,
+    "west":  80.2223,
+    "north": 13.1028,
+    "east":  80.2577,
 }
 
 PROJECT_ROOT = Path(__file__).parent

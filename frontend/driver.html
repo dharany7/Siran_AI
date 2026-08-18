@@ -34,7 +34,7 @@
       --green-dim: rgba(46,224,91,0.15);
       --radius:    14px;
       --radius-sm: 8px;
-      --sheet-h:   380px;
+      --sheet-h:   85vh;
       --sheet-peek: 110px;
     }
 
@@ -132,10 +132,12 @@
       position: fixed;
       bottom: 0; left: 0; right: 0;
       z-index: 200;
-      background: var(--panel);
-      border-radius: 22px 22px 0 0;
-      border-top: 1px solid var(--line-2);
-      box-shadow: 0 -8px 40px rgba(0,0,0,.5);
+      background: rgba(22, 23, 25, 0.85);
+      backdrop-filter: blur(20px) saturate(1.5);
+      -webkit-backdrop-filter: blur(20px) saturate(1.5);
+      border-radius: 24px 24px 0 0;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 -12px 40px rgba(0,0,0,0.6);
       height: var(--sheet-h);
       transform: translateY(calc(var(--sheet-h) - var(--sheet-peek)));
       transition: transform .35s cubic-bezier(.32,.72,0,1);
@@ -239,8 +241,43 @@
       box-shadow: 0 4px 20px rgba(34,217,192,.35);
     }
     .btn-primary.green {
-      background: linear-gradient(135deg, #20b845 0%, var(--green) 100%);
-      box-shadow: 0 4px 20px rgba(46,224,91,.35);
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+      height: 56px; /* Taller ride-hailing style */
+      font-size: 16px;
+    }
+
+    /* ── AI Route Insight Box ────────────────────────────────────────── */
+    .ai-insight {
+      display: none;
+      margin: 12px 0;
+      padding: 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.5;
+      background: rgba(26, 184, 162, 0.1);
+      border: 1px solid rgba(26, 184, 162, 0.3);
+      color: var(--text);
+      animation: ai-glow 2s infinite alternate;
+    }
+    .ai-insight.fallback {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      animation: none;
+    }
+    .ai-insight-title {
+      font-weight: 700;
+      color: var(--teal);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ai-insight.fallback .ai-insight-title { color: var(--text); }
+    
+    @keyframes ai-glow {
+      from { box-shadow: 0 0 5px rgba(26, 184, 162, 0.1); }
+      to { box-shadow: 0 0 15px rgba(26, 184, 162, 0.3); }
     }
 
     .btn-link {
@@ -604,39 +641,41 @@
       html, body { overflow: hidden; }
 
       #app-wrap {
-        display: flex;
-        flex-direction: row;
+        position: relative;
         height: 100vh;
         width: 100vw;
-        position: static;           /* undo mobile absolute/relative tricks */
       }
 
-      /* Map fills remaining space */
+      /* Map fills entire screen */
       #map {
-        flex: 1;
-        position: relative;         /* Leaflet requires positioned parent */
-        height: 100vh;
-        width: auto;
+        position: absolute;
+        inset: 0;
+        z-index: 0;
       }
 
-      /* Sidebar */
+      /* Sidebar (Floating Card) */
       #sheet {
-        position: static !important;         /* override mobile position:absolute */
-        transform: none !important;          /* no translate */
+        position: absolute !important;
+        top: 24px !important;
+        left: 24px !important;
+        transform: none !important;
         width: 400px;
-        min-width: 400px;
         max-width: 400px;
-        height: 100vh;
-        border-radius: 0 !important;
-        border-right: 1px solid var(--line);
-        border-top: none !important;
+        max-height: calc(100vh - 48px);
+        border-radius: 24px !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        order: -1;                           /* sidebar on the LEFT */
-        background: var(--panel);
-        box-shadow: 2px 0 20px rgba(0,0,0,.4);
+        background: rgba(22, 23, 25, 0.85) !important;
+        backdrop-filter: blur(20px) saturate(1.5) !important;
+        -webkit-backdrop-filter: blur(20px) saturate(1.5) !important;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.6) !important;
+        z-index: 1000 !important;
       }
+
+      /* Hide mobile top bar and drag handle on desktop */
+      #topbar, .sheet-handle { display: none !important; }
 
       /* Sidebar brand header — visible on desktop */
       .sidebar-header {
@@ -713,8 +752,6 @@
         display: none;
         flex-direction: column;
         gap: 12px;
-        flex: 1;
-        overflow-y: auto;
       }
       #viewDriver.dispatching-desktop #driverContent { display: none; }
       #viewDriver.dispatching-desktop #dispatchCard  { display: flex; }
@@ -937,6 +974,11 @@
           <div class="tls-row" id="tlsBadges"></div>
         </div>
 
+        <div id="aiReasoningDesktop" class="ai-insight">
+          <div class="ai-insight-title">✨ AI Route Insight</div>
+          <div id="aiReasoningTextDesktop">Loading AI routing reasoning...</div>
+        </div>
+
         <button class="btn-cancel" onclick="finishDispatch()">✓ Mark Complete</button>
       </div>
     </div>
@@ -983,6 +1025,11 @@
           <div class="tls-row" id="tlsBadgesMobile"></div>
         </div>
 
+        <div id="aiReasoningMobile" class="ai-insight">
+          <div class="ai-insight-title">✨ AI Route Insight</div>
+          <div id="aiReasoningTextMobile">Loading AI routing reasoning...</div>
+        </div>
+
         <button class="btn-cancel" onclick="finishDispatch()">✓ Mark Complete</button>
       </div>
     </div>
@@ -1013,14 +1060,16 @@ const ME_KEY    = 'siren_me';
 /** Returns true when the viewport is wide enough for desktop sidebar layout */
 const isDesktop = () => window.matchMedia('(min-width: 769px)').matches;
 
-// ── Demo GPS presets (Kilpauk area) ──────────────────────────────────────────
+// ── Demo GPS presets (Kilpauk / wider medical district) ─────────────────────
+// Network bbox: S=13.0654 W=80.2223 N=13.1028 E=80.2577 (widen_network.py)
 const DEMO_PRESETS = [
   { label: 'Kilpauk Medical College',  lat: 13.0836, lng: 80.2367 },
   { label: 'Poonamallee High Rd',      lat: 13.0787, lng: 80.2455 },
   { label: 'Anna Nagar East',          lat: 13.0790, lng: 80.2270 },
   { label: 'Chetpet',                  lat: 13.0735, lng: 80.2360 },
 ];
-const KILPAUK = [DEMO_PRESETS[0].lat, DEMO_PRESETS[0].lng]; // map default
+// Centre of the wider network bbox — keeps all 58 hospitals visible at zoom 14
+const KILPAUK = [13.0841, 80.2400];
 
 let state = {
   token:          localStorage.getItem(TOKEN_KEY) || null,
@@ -1041,7 +1090,7 @@ let state = {
 // ─────────────────────────────────────────────────────────────────────────────
 const map = L.map('map', {
   center: KILPAUK,
-  zoom: 15,
+  zoom: 14,   // 14 shows the full wider network coverage (was 15 for Kilpauk-only)
   zoomControl: false,
   attributionControl: false,
 });
@@ -1658,7 +1707,21 @@ async function handleDispatch() {
       const msg = typeof data.detail === 'string' ? data.detail
         : typeof data.detail === 'object' ? (data.detail.reason || JSON.stringify(data.detail))
         : `HTTP ${r.status}`;
-      toast(msg, 'error');
+
+      // Snap failures should never reach here (hospital list is pre-filtered),
+      // but guard defensively: log to console only, do NOT show a UI banner.
+      const isSnapError = (
+        r.status === 422 &&
+        typeof msg === 'string' && (
+          msg.toLowerCase().includes('snap') ||
+          msg.toLowerCase().includes('sumo edge')
+        )
+      );
+      if (isSnapError) {
+        console.warn('[dispatch] snap error (hospital should have been filtered):', msg);
+      } else {
+        toast(msg, 'error');
+      }
       return;
     }
 
@@ -1706,13 +1769,23 @@ function showDispatchView(data) {
     document.getElementById('etaTime').textContent     = etaTxt;
     document.getElementById('etaTls').textContent      = tlsCount;
     document.getElementById('etaEdges').textContent    = edgesTxt;
-    if (tls.length) {
-      document.getElementById('tlsRow').style.display  = 'block';
-      document.getElementById('tlsBadges').innerHTML   = tls.map(t =>
-        `<span class="tls-badge">${t.junction_id} (${Math.round(t.distance_m)}m)</span>`
-      ).join('');
-    }
-  } else {
+      if (tls.length) {
+        document.getElementById('tlsRow').style.display  = 'block';
+        document.getElementById('tlsBadges').innerHTML   = tls.map(t =>
+          `<span class="tls-badge">${t.junction_id} (${Math.round(t.distance_m)}m)</span>`
+        ).join('');
+      }
+      
+      const aiBox = document.getElementById('aiReasoningDesktop');
+      const aiTxt = document.getElementById('aiReasoningTextDesktop');
+      if (data.navigator_reasoning) {
+        aiBox.style.display = 'block';
+        aiTxt.textContent = data.navigator_reasoning.replace('[FALLBACK]', '').trim();
+        aiBox.classList.toggle('fallback', data.navigator_reasoning.includes('[FALLBACK]'));
+      } else {
+        aiBox.style.display = 'none';
+      }
+    } else {
     // ── Mobile: full-page view swap ───────────────────────────────────────
     showView('viewDispatch');
 
@@ -1721,13 +1794,23 @@ function showDispatchView(data) {
     document.getElementById('etaTimeMobile').textContent     = etaTxt;
     document.getElementById('etaTlsMobile').textContent      = tlsCount;
     document.getElementById('etaEdgesMobile').textContent    = edgesTxt;
-    if (tls.length) {
-      document.getElementById('tlsRowMobile').style.display  = 'block';
-      document.getElementById('tlsBadgesMobile').innerHTML   = tls.map(t =>
-        `<span class="tls-badge">${t.junction_id} (${Math.round(t.distance_m)}m)</span>`
-      ).join('');
+      if (tls.length) {
+        document.getElementById('tlsRowMobile').style.display  = 'block';
+        document.getElementById('tlsBadgesMobile').innerHTML   = tls.map(t =>
+          `<span class="tls-badge">${t.junction_id} (${Math.round(t.distance_m)}m)</span>`
+        ).join('');
+      }
+
+      const aiBoxM = document.getElementById('aiReasoningMobile');
+      const aiTxtM = document.getElementById('aiReasoningTextMobile');
+      if (data.navigator_reasoning) {
+        aiBoxM.style.display = 'block';
+        aiTxtM.textContent = data.navigator_reasoning.replace('[FALLBACK]', '').trim();
+        aiBoxM.classList.toggle('fallback', data.navigator_reasoning.includes('[FALLBACK]'));
+      } else {
+        aiBoxM.style.display = 'none';
+      }
     }
-  }
 
   // Animate progress bar — same element ids used on both paths
   const progBarId = isDesktop() ? 'progressBar' : 'progressBarMobile';
@@ -1907,20 +1990,29 @@ async function animateRoute(data) {
   // ── 10. TLS signal markers (time-driven, no TraCI poll) ─────────────────────
   placeTlsMarkers(data.tls_schedule || [], animStart, rawEta);
 
-  // ── 11. Backend completion poll (safety net — rAF also auto-finishes) ───────
-  // This catches edge cases where the user navigates away and returns, or
-  // the server reports completion before the visual animation ends.
-  _pollIntId = setInterval(async () => {
-    if (!state.dispatching) { clearInterval(_pollIntId); _pollIntId = null; return; }
-    try {
-      const r = await fetch(`${API}/dispatch/status`, {
-        headers: { Authorization: `Bearer ${state.token}` },
-      });
-      if (!r.ok) return;
-      const d = await r.json();
-      if (d.completed === true) finishDispatch(true);
-    } catch { /* ignore */ }
-  }, 5000);
+  // ── 11. WebSocket listener for live updates ───────────────────────────────
+  // Replaces the broken GET /dispatch/status polling loop.
+  if (!window._wsLogsConnected) {
+    window._wsLogsConnected = true;
+    const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${protocol}://${location.host}/ws/logs`);
+    ws.onmessage = (evt) => {
+      try {
+        const data = JSON.parse(evt.data);
+        if (data.event === "DISPATCH_COMPLETED" && state.dispatching) {
+          finishDispatch(true);
+        } else if (data.event === "SIGNAL_PREEMPTED" || (data.payload && data.payload.signal_green)) {
+          const jid = data.junction_id || (data.payload && data.payload.junction_id);
+          const entry = _tlsMarkers.find(m => m.junction_id === jid);
+          if (entry) {
+            entry.mstate = 'green';
+            entry.marker.setIcon(makeTlsIcon('green', entry.junction_id));
+            entry.marker.setTooltipContent(`🚦 ${entry.junction_id}<br>🟢 Preempted (GREEN)`);
+          }
+        }
+      } catch (e) { /* ignore */ }
+    };
+  }
 }
 
 

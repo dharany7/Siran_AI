@@ -36,6 +36,7 @@ import logging
 import os
 import subprocess
 import tempfile
+import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -79,28 +80,37 @@ def route_via_duarouter(
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
-        trips_xml = tmp / "ambulance_trip.xml"
+        trips_xml  = tmp / "ambulance_trip.xml"
         routes_xml = tmp / "ambulance_route.xml"
-        alt_xml    = tmp / "ambulance_route.alt.xml"
 
-        # Write a single-vehicle trip file
+        # Write a single-vehicle trip file.
+        # IMPORTANT: do NOT reference a named vType that is not defined in the
+        # network/additional files — duarouter will refuse to route the trip.
+        # We define an inline <vType> with vClass="emergency" so duarouter can
+        # plan a valid passenger-accessible route for the ambulance.
         trips_xml.write_text(
             '<?xml version="1.0"?>\n'
-            '<trips>\n'
+            '<routes>\n'
+            '  <vType id="ambulance" vClass="emergency" guiShape="emergency" speedFactor="1.3"\n'
+            '         maxSpeed="22.2" accel="2.6" decel="4.5" sigma="0.5" length="7"/>\n'
             f'  <trip id="amb" depart="0" from="{start_edge}" to="{end_edge}"'
             '   type="ambulance"/>\n'
-            '</trips>\n'
+            '</routes>\n'
         )
 
+        t0 = time.perf_counter()
         cmd = [
             str(DUAROUTER),
-            "--net-file", str(net_file),
-            "--trip-files", str(trips_xml),
-            "-o", str(routes_xml),
+            "--net-file",    str(net_file),
+            "--route-files", str(trips_xml),   # --trip-files is deprecated
+            "-o",            str(routes_xml),
             "--no-warnings",
             "--ignore-errors",
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        logger.info("duarouter finished in %.0f ms (rc=%d)", elapsed_ms, result.returncode)
+
         if result.returncode != 0 and not routes_xml.exists():
             raise RuntimeError(
                 f"duarouter failed (rc={result.returncode}): {result.stderr[:500]}"

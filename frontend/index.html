@@ -867,6 +867,241 @@
     ::-webkit-scrollbar-track {
       background: transparent;
     }
+
+    /* ---- PAGE 5: Acoustic Trigger Demo ---- */
+
+    /* Control bar */
+    .acd-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .acd-select {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 12.5px;
+      padding: 8px 12px;
+      cursor: pointer;
+      min-width: 160px;
+      outline: none;
+    }
+
+    .acd-select:focus {
+      border-color: var(--teal);
+    }
+
+    .acd-btn {
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all .15s ease;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .acd-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .acd-btn.siren {
+      background: rgba(255, 71, 87, 0.15);
+      color: var(--red);
+      border: 1px solid rgba(255, 71, 87, 0.35);
+    }
+
+    .acd-btn.siren:hover:not(:disabled) {
+      background: rgba(255, 71, 87, 0.28);
+      box-shadow: 0 0 12px rgba(255, 71, 87, 0.2);
+    }
+
+    .acd-btn.ambient {
+      background: rgba(76, 141, 255, 0.12);
+      color: var(--blue);
+      border: 1px solid rgba(76, 141, 255, 0.3);
+    }
+
+    .acd-btn.ambient:hover:not(:disabled) {
+      background: rgba(76, 141, 255, 0.24);
+    }
+
+    .acd-btn.reset {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--line);
+    }
+
+    .acd-btn.reset:hover:not(:disabled) {
+      color: var(--text);
+      border-color: var(--muted);
+    }
+
+    .acd-btn.authorized {
+      background: rgba(34, 217, 192, 0.12);
+      color: var(--teal);
+      border: 1px solid rgba(34, 217, 192, 0.35);
+    }
+
+    .acd-btn.authorized:hover:not(:disabled) {
+      background: rgba(34, 217, 192, 0.24);
+      box-shadow: 0 0 14px rgba(34, 217, 192, 0.25);
+    }
+
+    /* 4-step status strip */
+    .acd-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .acd-step {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px 14px 14px;
+      position: relative;
+      transition: all .35s ease;
+    }
+
+    .acd-step.active {
+      border-color: var(--teal);
+      background: rgba(34, 217, 192, 0.07);
+      box-shadow: 0 0 18px rgba(34, 217, 192, 0.12);
+    }
+
+    .acd-step.skipped {
+      border-color: var(--muted);
+      opacity: 0.5;
+    }
+
+    .acd-step.error {
+      border-color: var(--red);
+      background: rgba(255, 71, 87, 0.07);
+    }
+
+    .acd-step-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .acd-step-icon {
+      font-size: 22px;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .acd-step-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .acd-step-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      color: var(--teal);
+      min-height: 16px;
+    }
+
+    .acd-step.skipped .acd-step-val,
+    .acd-step.error   .acd-step-val {
+      color: var(--muted);
+    }
+
+    /* connector arrows between steps */
+    .acd-strip-wrap {
+      position: relative;
+    }
+
+    /* mini-map for acoustic demo */
+    .acd-map {
+      background:
+        radial-gradient(circle at 30% 40%, rgba(255, 71, 87, 0.07), transparent 45%),
+        var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px;
+      height: 280px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .acd-map .city-grid {
+      opacity: 0.25;
+    }
+
+    .acd-junction {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--line);
+      background: var(--panel-2);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 7px;
+      color: var(--muted);
+      transition: all .4s ease;
+      cursor: default;
+    }
+
+    .acd-junction.selected {
+      border-color: var(--amber);
+      background: rgba(255, 176, 32, 0.15);
+      color: var(--amber);
+      box-shadow: 0 0 10px rgba(255, 176, 32, 0.3);
+    }
+
+    .acd-junction.flipped {
+      border-color: var(--teal);
+      background: rgba(34, 217, 192, 0.18);
+      color: var(--teal);
+      box-shadow: 0 0 16px rgba(34, 217, 192, 0.5);
+      animation: acd-pulse 1.2s ease-in-out 3;
+    }
+
+    @keyframes acd-pulse {
+      0%, 100% { box-shadow: 0 0 16px rgba(34, 217, 192, 0.5); }
+      50%       { box-shadow: 0 0 30px rgba(34, 217, 192, 0.9); }
+    }
+
+    /* log tag for acoustic_demo events */
+    .log-tag.acd {
+      color: #C77DFF;
+    }
+
+    /* busy spinner on buttons during fetch */
+    .acd-spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 
@@ -888,6 +1123,7 @@
         <div class="nav-item" data-page="p2"><span class="dot"></span> Live Dispatch</div>
         <div class="nav-item" data-page="p3"><span class="dot"></span> Security &amp; Verification</div>
         <div class="nav-item" data-page="p4"><span class="dot"></span> Impact &amp; Scoring</div>
+        <div class="nav-item" data-page="p5"><span class="dot"></span> &#127908; Acoustic Demo</div>
       </nav>
 
       <div class="sidebar-foot">
@@ -1234,6 +1470,122 @@
           </div>
         </div>
       </section>
+
+      <!-- ================= PAGE 5: Acoustic Trigger Demo ================= -->
+      <section class="page" id="p5">
+
+        <!-- ── Top row: controls + 4-step strip ─────────────────────────── -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-head">
+            <div>
+              <div class="eyebrow">Acoustic Detection Demo</div>
+              <h3 style="font-size:15px;">Pre-recorded clip &#8594; RF Classifier &#8594; ANPR &#8594; TLS Flip</h3>
+            </div>
+            <span class="badge ok" id="acd-status-badge">&#9679; Ready</span>
+          </div>
+
+          <!-- Controls -->
+          <div class="acd-controls">
+            <div>
+              <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.8px;">Junction</label>
+              <select class="acd-select" id="acd-junction">
+                <option value="">Loading junctions&#x2026;</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.8px;">Clip</label>
+              <select class="acd-select" id="acd-sample">
+                <option value="">Loading clips&#x2026;</option>
+              </select>
+            </div>
+            <div style="align-self:flex-end;display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="acd-btn siren" id="acd-btn-siren" title="Siren clip + civilian plate (reject path)">
+                &#128266; Play Siren Clip
+              </button>
+              <button class="acd-btn authorized" id="acd-btn-authorized" title="Siren clip + authorized ambulance plate (green-light path)">
+                &#128657; Siren + Authorized Plate
+              </button>
+              <button class="acd-btn ambient" id="acd-btn-ambient" title="Submit an ambient (non-siren) sample">
+                &#127807; Play Ambient Noise
+              </button>
+              <button class="acd-btn reset" id="acd-btn-reset">Reset</button>
+            </div>
+          </div>
+
+          <!-- 4-step status strip -->
+          <div class="acd-strip" id="acd-strip">
+            <div class="acd-step" id="acd-s1">
+              <div class="acd-step-num">01</div>
+              <div class="acd-step-icon">&#127908;</div>
+              <div class="acd-step-title">Mic / Input</div>
+              <div class="acd-step-val" id="acd-s1-val">Waiting&hellip;</div>
+            </div>
+            <div class="acd-step" id="acd-s2">
+              <div class="acd-step-num">02</div>
+              <div class="acd-step-icon">&#129504;</div>
+              <div class="acd-step-title">RF Classifier</div>
+              <div class="acd-step-val" id="acd-s2-val">Waiting&hellip;</div>
+            </div>
+            <div class="acd-step" id="acd-s3">
+              <div class="acd-step-num">03</div>
+              <div class="acd-step-icon">&#128247;</div>
+              <div class="acd-step-title">Camera / ANPR</div>
+              <div class="acd-step-val" id="acd-s3-val">Waiting&hellip;</div>
+            </div>
+            <div class="acd-step" id="acd-s4">
+              <div class="acd-step-num">04</div>
+              <div class="acd-step-icon">&#128678;</div>
+              <div class="acd-step-title">Signal Flip</div>
+              <div class="acd-step-val" id="acd-s4-val">Waiting&hellip;</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Bottom row: log + mini-map ───────────────────────────────── -->
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px;">
+
+          <!-- Event log (dedicated to acoustic demo events) -->
+          <div class="card" style="padding:16px 18px;">
+            <div class="card-head">
+              <h3>Pipeline Event Log</h3>
+              <span class="badge ok" style="font-size:10px;">&#9679; Live</span>
+            </div>
+            <div class="log-feed" id="acd-log" style="height:320px;">
+              <div class="log-line">
+                <span class="log-time">--:--:--</span>
+                <span class="log-tag acd">ACD</span>
+                <span class="log-text">Acoustic Demo ready. Select a junction and clip, then click a button.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mini-map showing junction markers -->
+          <div class="card" style="padding:16px 18px;">
+            <div class="card-head">
+              <h3>Junction Map</h3>
+              <span style="font-size:10.5px;color:var(--muted);">Selected junction highlights amber; green on signal flip</span>
+            </div>
+            <div class="acd-map" id="acd-map">
+              <div class="city-grid"></div>
+              <!-- Junction markers — generated by JS from /junction/demo-assets/junctions -->
+            </div>
+            <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--muted);">
+              <span style="display:flex;align-items:center;gap:5px;">
+                <span style="width:8px;height:8px;border-radius:2px;background:var(--amber);display:inline-block;"></span>
+                Selected junction
+              </span>
+              <span style="display:flex;align-items:center;gap:5px;">
+                <span style="width:8px;height:8px;border-radius:2px;background:var(--teal);display:inline-block;"></span>
+                Signal flipped green
+              </span>
+              <span style="display:flex;align-items:center;gap:5px;">
+                <span style="width:8px;height:8px;border-radius:2px;background:var(--line);border:1px solid var(--muted);display:inline-block;"></span>
+                Normal cycle
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -1244,7 +1596,8 @@
       p1: ['Command Dashboard', 'Real-time multi-agent traffic control overview'],
       p2: ['Live Dispatch', 'Agent negotiation for active ambulance corridor'],
       p3: ['Security & Verification', 'ANPR checks and prompt-injection guard events'],
-      p4: ['Impact & Scoring', 'Rubric alignment and architecture summary']
+      p4: ['Impact & Scoring', 'Rubric alignment and architecture summary'],
+      p5: ['Acoustic Trigger Demo', 'Pre-recorded clip → RF classifier → ANPR → TLS signal flip']
     };
     navItems.forEach(item => {
       item.addEventListener('click', () => {
@@ -1387,7 +1740,340 @@
       }
 
       connect();
+
+      // ── Route acoustic_demo WS events to the demo page ──────────────────
+      const _origHandleEvent = handleEvent;
+      function handleEvent(data) {
+        _origHandleEvent(data);
+        if (data.type === 'acoustic_demo') {
+          acdHandleWsEvent(data);
+        }
+      }
     })();
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       ACOUSTIC DEMO — standalone IIFE so nothing leaks into global scope
+       and the existing WS IIFE is completely untouched.
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <script>
+  (function () {
+    'use strict';
+
+    const API = '';  // same-origin — no prefix needed
+
+    // ── DOM refs ──────────────────────────────────────────────────────────
+    const $junctionSel  = document.getElementById('acd-junction');
+    const $sampleSel    = document.getElementById('acd-sample');
+    const $btnSiren     = document.getElementById('acd-btn-siren');
+    const $btnAuthorized= document.getElementById('acd-btn-authorized');
+    const $btnAmbient   = document.getElementById('acd-btn-ambient');
+    const $btnReset     = document.getElementById('acd-btn-reset');
+    const $log          = document.getElementById('acd-log');
+    const $map          = document.getElementById('acd-map');
+    const $badge        = document.getElementById('acd-status-badge');
+
+    // Step elements
+    const steps = [1, 2, 3, 4].map(n => ({
+      el:  document.getElementById('acd-s' + n),
+      val: document.getElementById('acd-s' + n + '-val'),
+    }));
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+    function ts() {
+      const d = new Date();
+      return [d.getHours(), d.getMinutes(), d.getSeconds()]
+        .map(n => String(n).padStart(2, '0')).join(':');
+    }
+
+    function acdLog(msg, tagClass) {
+      tagClass = tagClass || 'acd';
+      const line = document.createElement('div');
+      line.className = 'log-line';
+      const safe = msg.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      line.innerHTML =
+        '<span class="log-time">' + ts() + '</span>' +
+        '<span class="log-tag ' + tagClass + '">ACD</span>' +
+        '<span class="log-text">' + safe + '</span>';
+      $log.appendChild(line);
+      $log.scrollTop = $log.scrollHeight;
+      while ($log.children.length > 200) $log.removeChild($log.firstChild);
+    }
+
+    function setStepState(idx, state, valText) {
+      // idx: 0-based.  state: '' | 'active' | 'skipped' | 'error'
+      const s = steps[idx];
+      s.el.className  = 'acd-step' + (state ? ' ' + state : '');
+      s.val.textContent = valText || '';
+    }
+
+    function resetStrip() {
+      steps.forEach(s => {
+        s.el.className  = 'acd-step';
+        s.val.textContent = 'Waiting\u2026';
+      });
+    }
+
+    function setBusy(busy) {
+      $btnSiren.disabled      = busy;
+      $btnAuthorized.disabled = busy;
+      $btnAmbient.disabled    = busy;
+      if (busy) {
+        $badge.innerHTML = '<span class="acd-spinner"></span> Running';
+        $badge.style.color = 'var(--amber)';
+      } else {
+        $badge.innerHTML = '&#9679; Ready';
+        $badge.style.color = '';
+      }
+    }
+
+    // ── Map junction management ────────────────────────────────────────────
+    const _mapJunctions = {};   // id -> marker element
+    let   _currentJunctionId = null;
+
+    // Deterministic scatter positions (pseudo-random but stable)
+    function _jPos(idx, total) {
+      const cols = Math.ceil(Math.sqrt(total));
+      const row  = Math.floor(idx / cols);
+      const col  = idx % cols;
+      const xPct = 8 + col * (84 / Math.max(cols - 1, 1));
+      const yPct = 10 + row * (80 / Math.max(Math.ceil(total / cols) - 1, 1));
+      return { x: xPct, y: yPct };
+    }
+
+    function buildMap(junctions) {
+      // Remove old markers (keep city-grid)
+      Object.values(_mapJunctions).forEach(el => el.remove());
+      Object.keys(_mapJunctions).forEach(k => delete _mapJunctions[k]);
+
+      junctions.forEach((jid, i) => {
+        const pos = _jPos(i, junctions.length);
+        const el  = document.createElement('div');
+        el.className   = 'acd-junction';
+        el.style.left  = pos.x + '%';
+        el.style.top   = pos.y + '%';
+        el.title       = jid;
+        el.textContent = 'J' + (i + 1);
+        $map.appendChild(el);
+        _mapJunctions[jid] = el;
+      });
+    }
+
+    function highlightSelected(jid) {
+      // Reset all
+      Object.values(_mapJunctions).forEach(el => {
+        el.classList.remove('selected', 'flipped');
+      });
+      if (jid && _mapJunctions[jid]) {
+        _mapJunctions[jid].classList.add('selected');
+      }
+      _currentJunctionId = jid;
+    }
+
+    function flipJunctionGreen(jid) {
+      if (_mapJunctions[jid]) {
+        _mapJunctions[jid].classList.remove('selected');
+        _mapJunctions[jid].classList.add('flipped');
+      }
+    }
+
+    // Update marker when junction selector changes
+    $junctionSel.addEventListener('change', () => {
+      highlightSelected($junctionSel.value);
+    });
+
+    // ── WS event handler (called by the outer WS IIFE) ─────────────────────
+    window.acdHandleWsEvent = function (data) {
+      const p = data.payload || {};
+      const stage = p.stage;
+      const jid   = p.junction_id;
+
+      acdLog(data.msg || stage);
+
+      if (stage === 'mic_heard') {
+        setStepState(0, 'active', p.audio_label || 'clip received');
+      }
+      else if (stage === 'siren_classified') {
+        const is_s = p.is_siren;
+        const conf = (p.confidence != null) ? (p.confidence * 100).toFixed(1) + '%' : '?';
+        if (is_s) {
+          setStepState(1, 'active', 'SIREN  ' + conf + '  ' + (p.label || ''));
+        } else {
+          setStepState(1, 'skipped', 'NOT siren  ' + conf + '  ' + (p.label || ''));
+        }
+      }
+      else if (stage === 'camera_triggered') {
+        setStepState(2, 'active',
+          p.plate_text ? 'Plate: ' + p.plate_text : 'Camera triggered');
+      }
+      else if (stage === 'anpr_confirmed') {
+        const auth = p.is_authorized;
+        const plate = p.plate_text || '?';
+        setStepState(2, auth ? 'active' : 'error',
+          (auth ? 'AUTH: ' : 'UNAUTH: ') + plate);
+      }
+      else if (stage === 'signal_flipped') {
+        if (p.signal_green) {
+          setStepState(3, 'active', 'GREEN  ' + (jid || ''));
+          flipJunctionGreen(jid);
+        } else if (p.skip_reason || p.skipped) {
+          setStepState(3, 'skipped',
+            p.reason || p.skip_reason || 'skipped');
+        } else {
+          setStepState(3, 'error', p.error || 'failed');
+        }
+      }
+    };
+
+    // ── Fetch junction & sample lists on page load ─────────────────────────
+    Promise.all([
+      fetch(API + '/junction/demo-assets/junctions').then(r => r.json()),
+      fetch(API + '/junction/demo-assets/list').then(r => r.json()),
+    ]).then(([jData, sData]) => {
+
+      // Populate junction selector
+      const junctions = jData.junctions || [];
+      $junctionSel.innerHTML = '';
+      junctions.forEach((jid, i) => {
+        const opt = document.createElement('option');
+        opt.value       = jid;
+        opt.textContent = 'J' + (i + 1) + ' — ' + jid.substring(0, 22) + (jid.length > 22 ? '...' : '');
+        $junctionSel.appendChild(opt);
+      });
+
+      buildMap(junctions);
+      highlightSelected($junctionSel.value);
+
+      // Populate sample selector (sirens first)
+      const sirens  = sData.sirens  || [];
+      const ambient = sData.ambient || [];
+      $sampleSel.innerHTML = '';
+
+      const addGroup = (label, files) => {
+        const grp = document.createElement('optgroup');
+        grp.label = label;
+        files.forEach(f => {
+          const opt = document.createElement('option');
+          opt.value       = f;
+          opt.textContent = f;
+          grp.appendChild(opt);
+        });
+        $sampleSel.appendChild(grp);
+      };
+      addGroup('Siren clips',  sirens);
+      addGroup('Ambient clips', ambient);
+
+      acdLog('Loaded ' + junctions.length + ' junctions, ' +
+             sirens.length + ' siren clips, ' + ambient.length + ' ambient clips.');
+
+    }).catch(err => {
+      acdLog('ERROR loading demo assets: ' + err, 'sec');
+    });
+
+    // ── Button logic ───────────────────────────────────────────────────────
+    // plateName: optional filename from demo-assets/plates/ — passed as plate_name
+    //   undefined / null  → backend defaults to plate_demo.jpg (civilian, reject path)
+    //   'plate_demo_authorized.jpg' → ambulance TN87C5106 (green-light path)
+    async function triggerPipeline(forceSample, plateName) {
+      const junction = $junctionSel.value;
+      if (!junction) {
+        acdLog('Please select a junction first.', 'sec');
+        return;
+      }
+      const sample = forceSample || $sampleSel.value;
+      if (!sample) {
+        acdLog('Please select a clip first.', 'sec');
+        return;
+      }
+
+      resetStrip();
+      highlightSelected(junction);
+      setBusy(true);
+
+      const plateLabel = plateName ? plateName : 'plate_demo.jpg (civilian)';
+      acdLog('--- New run: junction=' + junction + '  clip=' + sample +
+             '  plate=' + plateLabel + ' ---');
+
+      const fd = new FormData();
+      fd.append('sample_name', sample);
+      if (plateName) fd.append('plate_name', plateName);
+
+      try {
+        const resp = await fetch(
+          API + '/junction/' + encodeURIComponent(junction) + '/acoustic-event',
+          { method: 'POST', body: fd }
+        );
+        if (!resp.ok) {
+          const detail = await resp.text();
+          acdLog('HTTP ' + resp.status + ': ' + detail, 'sec');
+        } else {
+          // Response is the full summary — WS events have already updated the strip
+          const body = await resp.json();
+          const sig  = body.signal_flipped;
+          if (sig && sig.signal_green) {
+            acdLog('Pipeline complete — signal FLIPPED GREEN at ' + junction);
+          } else if (body.siren_classified && !body.siren_classified.is_siren) {
+            acdLog('Pipeline complete — ambient clip rejected (not siren).');
+          } else if (sig && sig.reason === 'plate_not_authorized') {
+            const plate = (body.anpr_confirmed || {}).plate_text || '?';
+            acdLog('Pipeline complete — ANPR rejected civilian plate (' + plate + ').');
+          } else if (sig && sig.reason === 'sim_not_running') {
+            const plate = (body.anpr_confirmed || {}).plate_text || '?';
+            acdLog('Pipeline complete — plate ' + plate + ' authorized; SUMO offline (signal would flip live).');
+          } else {
+            acdLog('Pipeline complete.');
+          }
+        }
+      } catch (err) {
+        acdLog('Fetch error: ' + err, 'sec');
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    $btnSiren.addEventListener('click', () => {
+      // Find first siren_ option in the selector
+      let sirenOpt = null;
+      for (const opt of $sampleSel.options) {
+        if (opt.value.startsWith('siren_')) { sirenOpt = opt.value; break; }
+      }
+      if (sirenOpt) $sampleSel.value = sirenOpt;
+      // Default plate = civilian plate_demo.jpg (no plate_name → reject path)
+      triggerPipeline(sirenOpt, null);
+    });
+
+    $btnAuthorized.addEventListener('click', () => {
+      // Siren clip + authorized ambulance plate → full green-light path
+      let sirenOpt = null;
+      for (const opt of $sampleSel.options) {
+        if (opt.value.startsWith('siren_')) { sirenOpt = opt.value; break; }
+      }
+      if (sirenOpt) $sampleSel.value = sirenOpt;
+      triggerPipeline(sirenOpt, 'plate_demo_authorized.jpg');
+    });
+
+    $btnAmbient.addEventListener('click', () => {
+      // Find first ambient_ option
+      let ambOpt = null;
+      for (const opt of $sampleSel.options) {
+        if (opt.value.startsWith('ambient_')) { ambOpt = opt.value; break; }
+      }
+      if (ambOpt) $sampleSel.value = ambOpt;
+      triggerPipeline(ambOpt, null);
+    });
+
+    $btnReset.addEventListener('click', () => {
+      resetStrip();
+      highlightSelected($junctionSel.value);
+      // Remove any flipped markers
+      Object.values(_mapJunctions).forEach(el => {
+        el.classList.remove('flipped');
+        if (el.title === _currentJunctionId) el.classList.add('selected');
+      });
+      acdLog('Strip reset.');
+    });
+
+  })();
   </script>
 </body>
 

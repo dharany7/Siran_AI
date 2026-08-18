@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.config import settings
 from backend.database import init_db
-from backend.routers import health, sim, dispatch, security, audio, anpr, ws, auth
+from backend.routers import health, sim, dispatch, security, audio, anpr, ws, auth, acoustic_demo
 from backend.routers.route_geometry import router as route_geometry_router
 
 
@@ -45,6 +45,88 @@ async def lifespan(app: FastAPI):
 
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, _start_sim)
+
+    # ── Startup snap-check: update is_routable for all hospitals ─────────────
+    # Uses sumolib (no TraCI needed) so it runs even if SUMO is offline.
+    # Excluded hospitals are logged at WARNING level; no UI error is shown.
+    def _snap_check():
+        import math, xml.etree.ElementTree as ET, os, sys
+        from pathlib import Path
+        try:
+            from backend.database import SessionLocal
+            from backend.models   import Hospital
+
+            net_path = Path(__file__).parent.parent / "sumo_net" / "kilpauk.net.xml"
+            if not net_path.exists():
+                _log.warning("snap_check: net.xml not found — skipping")
+                return
+
+            # Parse edge midpoints without sumolib (avoids optional dep)
+            tree = ET.parse(str(net_path))
+            root = tree.getroot()
+            loc  = root.find("location")
+            ox, oy   = [float(v) for v in loc.get("netOffset", "0,0").split(",")]
+            proj_str = loc.get("projParameter", "")
+
+            midpoints = []
+            for edge_el in root.iter("edge"):
+                if edge_el.get("id", "").startswith(":"):
+                    continue
+                for lane_el in edge_el.findall("lane"):
+                    shape = lane_el.get("shape", "")
+                    if not shape:
+                        continue
+                    pts = [tuple(float(v) for v in p.split(",")) for p in shape.split()]
+                    if pts:
+                        midpoints.append((
+                            sum(p[0] for p in pts) / len(pts),
+                            sum(p[1] for p in pts) / len(pts),
+                        ))
+                    break
+
+            def _project(lat, lng):
+                try:
+                    from pyproj import Proj
+                    ux, uy = Proj(proj_str)(lng, lat)
+                    return ux + ox, uy + oy
+                except Exception:
+                    LAT0, LON0 = 13.083, 80.237
+                    M = 111_320.0
+                    import math
+                    ux = LON0 * M + (lng - LON0) * M
+                    uy = LAT0 * M + (lat - LAT0) * (M * math.cos(math.radians(LAT0)))
+                    return ux + ox, uy + oy
+
+            MAX_DIST = 200.0   # metres — matches nearest_edge(radius=) in sumo_env.py
+            db = SessionLocal()
+            try:
+                hospitals = db.query(Hospital).order_by(Hospital.id).all()
+                excluded, updated = [], 0
+                for h in hospitals:
+                    sx, sy = _project(h.lat, h.lng)
+                    dist   = min(math.hypot(sx - mx, sy - my) for mx, my in midpoints)
+                    routable = dist <= MAX_DIST
+                    if h.is_routable != routable:
+                        h.is_routable = routable
+                        updated += 1
+                    if not routable:
+                        excluded.append((h.name, h.lat, h.lng, dist))
+                db.commit()
+                _log.info(
+                    "snap_check: %d hospitals checked, %d updated, %d excluded",
+                    len(hospitals), updated, len(excluded),
+                )
+                for name, lat, lng, dist in excluded:
+                    _log.warning(
+                        "snap_check EXCLUDED: %r (%.6f, %.6f) nearest_edge=%.1fm > %.0fm",
+                        name, lat, lng, dist, MAX_DIST,
+                    )
+            finally:
+                db.close()
+        except Exception as exc:
+            _log.warning("snap_check: failed (hospitals not filtered): %s", exc)
+
+    await loop.run_in_executor(None, _snap_check)
 
     yield  # ── Application runs ─────────────────────────────────────────────
 
@@ -90,6 +172,9 @@ def create_app() -> FastAPI:
     app.include_router(anpr.router)
     app.include_router(ws.router)       # WebSocket live-feed hub
     app.include_router(route_geometry_router)  # GET /route/geometry
+    app.include_router(acoustic_demo.router)   # POST /junction/{id}/acoustic-event
+    from backend.routers import corridor
+    app.include_router(corridor.router)   # POST /corridor/sensor-trigger
 
     # ── Hospitals listing ─────────────────────────────────────────────────────
     from fastapi import Depends
@@ -101,9 +186,10 @@ def create_app() -> FastAPI:
     def list_hospitals(db: Session = Depends(get_db)):
         """
         Returns only hospitals whose coordinates can be snapped to a SUMO edge
-        within 150 m (``is_routable = True``).  Non-routable hospitals cause
-        dispatch to fail immediately, so they are excluded from the driver's list.
-        Run ``python validate_hospitals.py`` to (re-)populate the flag.
+        within 200 m (``is_routable = True``).  Non-routable hospitals are
+        excluded silently — they are filtered at server startup by the
+        automatic snap-check and logged to the backend console.
+        Run ``python validate_hospitals.py`` to re-populate the flag manually.
         """
         hosps = (
             db.query(Hospital)

@@ -135,7 +135,7 @@ class Hospital(Base):
         default=True,
         server_default="true",   # PostgreSQL literal — keeps existing rows non-null
         comment="True if the hospital's lat/lng can be snapped to a SUMO edge "
-                "within 150 m. Set by validate_hospitals.py.",
+                "within 200 m. Set automatically at startup and by validate_hospitals.py.",
     )
 
     dispatches = relationship("Dispatch", back_populates="hospital")

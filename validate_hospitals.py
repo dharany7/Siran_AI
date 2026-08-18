@@ -29,7 +29,7 @@ HERE     = Path(__file__).parent
 NET_FILE = HERE / "sumo_net" / "kilpauk.net.xml"
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
-DEFAULT_MAX_DIST = 150.0   # metres — reject if nearest edge midpoint > this
+DEFAULT_MAX_DIST = 200.0   # metres — must match nearest_edge(radius=) in sumo_env.py
 
 
 # ─────────────────────────────────────────────────────────────────────────────
