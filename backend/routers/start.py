@@ -1,5 +1,5 @@
 """
-backend/routers/dispatch.py — POST /dispatch  (ambulance dispatch pipeline).
+backend/routers/start.py — POST /start  (ambulance start pipeline).
 
 Orchestration order
 -------------------
@@ -43,12 +43,12 @@ from security.guard import guard as prompt_guard
 from backend.routers.ws import bus as _bus
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/dispatch", tags=["Dispatch"])
+router = APIRouter(prefix="/start", tags=["Start"])
 
 
 # ── Request / response schemas ────────────────────────────────────────────────
 
-class DispatchRequest(BaseModel):
+class StartRequest(BaseModel):
     dest_hospital_id: int  = Field(..., description="Hospital ID from the hospitals table (GET /hospitals to list)")
     start_lat: float       = Field(13.0843, description="Driver's current latitude (WGS84)")
     start_lng: float       = Field(80.2371, description="Driver's current longitude (WGS84)")
@@ -62,7 +62,7 @@ class TLSScheduleEntry(BaseModel):
     green_at_step: int
 
 
-class DispatchResponse(BaseModel):
+class StartResponse(BaseModel):
     event_id:             int
     hospital_name:        str
     route_edges:          list[str]
@@ -88,10 +88,10 @@ def _get_sim(request: Request):
 
 @router.post(
     "",
-    response_model=DispatchResponse,
-    summary="Dispatch an ambulance through the live simulation",
+    response_model=StartResponse,
+    summary="Start an ambulance through the live simulation",
     description=(
-        "Runs the full Siren AI MAS dispatch pipeline:\n\n"
+        "Runs the full Siren AI MAS start pipeline:\n\n"
         "**Step 1 — Navigator (Gemini):** Queries the live SUMO traffic state "
         "(TLS phase, vehicle count) and asks Gemini to reason about the fastest "
         "route. Gemini must respond with strict JSON "
@@ -106,12 +106,12 @@ def _get_sim(request: Request):
         "**Requires `POST /sim/start` to have been called first.**"
     ),
 )
-def dispatch(
-    body:           DispatchRequest,
+def start(
+    body:           StartRequest,
     request:        Request,
     db:             Session = Depends(get_db),
     current_driver: Driver  = Depends(get_current_driver),
-) -> DispatchResponse:
+) -> StartResponse:
     """
     Synchronous handler — FastAPI runs this in a thread pool, making all
     blocking Gemini HTTP + TraCI calls safe without stalling the event loop.
@@ -119,7 +119,7 @@ def dispatch(
 
     # ── Pre-flight ────────────────────────────────────────────────────────────
     logger.info(
-        "dispatch: authenticated driver=%s plate=%s",
+        "start: authenticated driver=%s plate=%s",
         current_driver.id,
         current_driver.ambulance_plate,
     )
@@ -127,16 +127,16 @@ def dispatch(
     if sim is None or not getattr(sim, "is_connected", False):
         # ── Safety net: auto-start the simulation rather than returning an error ──
         logger.warning(
-            "dispatch: simulation not running — attempting auto-start before proceeding"
+            "start: simulation not running — attempting auto-start before proceeding"
         )
         try:
             from agents.sumo_env import SumoEnv
             sim = SumoEnv()
             sim.start()
             request.app.state.sim = sim
-            logger.info("dispatch: auto-started simulation (step=%d)", sim.step_count)
+            logger.info("start: auto-started simulation (step=%d)", sim.step_count)
         except Exception as _exc:
-            logger.error("dispatch: auto-start failed: %s", _exc)
+            logger.error("start: auto-start failed: %s", _exc)
             raise HTTPException(
                 status_code=503,
                 detail=(
@@ -177,7 +177,7 @@ def dispatch(
 
     logger.info("="*60)
     logger.info(
-        "DISPATCH: driver=(%s,%s) -> hospital=%s (%s,%s)",
+        "START: driver=(%s,%s) -> hospital=%s (%s,%s)",
         body.start_lat, body.start_lng,
         hospital.name, hospital.lat, hospital.lng,
     )
@@ -195,7 +195,7 @@ def dispatch(
             verdict        = _verdict,
             layer_blocked  = guard_result.layer if guard_result.blocked else None,
             blocked_reason = guard_result.reason if guard_result.blocked else None,
-            endpoint       = "/dispatch",
+            endpoint       = "/start",
         )
         db.add(sec_event)
         db.commit()
@@ -204,7 +204,7 @@ def dispatch(
 
     if guard_result.blocked:
         logger.warning(
-            "DISPATCH BLOCKED by guard (layer=%d): %s",
+            "START BLOCKED by guard (layer=%d): %s",
             guard_result.layer, guard_result.reason,
         )
         raise HTTPException(
@@ -236,7 +236,7 @@ def dispatch(
         raise HTTPException(status_code=500, detail=f"Could not read sim state: {exc}")
 
     logger.info(
-        "Pre-dispatch sim state: step=%d  tls_count=%d  vehicles=%d",
+        "Pre-start sim state: step=%d  tls_count=%d  vehicles=%d",
         sim_state["step"], sim_state.get("tls_count", 0), sim_state["vehicle_count"],
     )
 
@@ -313,7 +313,7 @@ def dispatch(
     try:
         notes_json = json.dumps(negotiation_log, ensure_ascii=False)
         event = SirenEvent(
-            siren_type = "ambulance_dispatch",
+            siren_type = "ambulance_start",
             confidence = f"{body.start_lat},{body.start_lng}->{hospital.name}",
             audio_file = None,
             notes      = notes_json,
@@ -322,7 +322,7 @@ def dispatch(
         db.commit()
         db.refresh(event)
         event_id = event.id
-        logger.info("Dispatch logged as SirenEvent id=%d", event_id)
+        logger.info("Start logged as SirenEvent id=%d", event_id)
     except Exception as exc:
         logger.error("DB logging failed: %s", exc)
 
@@ -338,7 +338,7 @@ def dispatch(
         for s in tls_schedule
     ]
 
-    resp = DispatchResponse(
+    resp = StartResponse(
         event_id            = event_id,
         hospital_name       = hospital.name,
         route_edges         = route,
@@ -355,8 +355,8 @@ def dispatch(
 
     # ── Broadcast to live dashboard ──────────────────────────────────────────
     _bus.publish_sync({
-        "type":    "dispatch",
-        "msg":     f"Ambulance dispatched to {hospital.name}  {len(route)} edges  "
+        "type":    "start",
+        "msg":     f"Ambulance started to {hospital.name}  {len(route)} edges  "
                    f"{distance_m:.0f}m  completed={completed}",
         "payload": {
             "event_id":      event_id,
@@ -375,27 +375,27 @@ def dispatch(
 # ── Cancel endpoint ────────────────────────────────────────────────
 
 @router.post(
-    "/{dispatch_id}/cancel",
-    summary="Cancel a previously logged dispatch event",
+    "/{start_id}/cancel",
+    summary="Cancel a previously logged start event",
     description=(
         "Marks a `SirenEvent` row as cancelled in the database by appending a "
         "cancellation payload to its `notes` JSON.  Called automatically by "
         "`POST /anpr/verify` when an unauthorized plate is detected."
     ),
 )
-def cancel_dispatch(
-    dispatch_id: int,
+def cancel_start(
+    start_id: int,
     db: Session = Depends(get_db),
 ) -> dict:
     """
-    Mark dispatch *dispatch_id* as cancelled.
+    Mark start *start_id* as cancelled.
     Returns 404 if the event does not exist.
     """
-    event = db.query(SirenEvent).filter(SirenEvent.id == dispatch_id).first()
+    event = db.query(SirenEvent).filter(SirenEvent.id == start_id).first()
     if event is None:
         raise HTTPException(
             status_code=404,
-            detail=f"No dispatch event with id={dispatch_id}.",
+            detail=f"No start event with id={start_id}.",
         )
 
     try:
@@ -404,13 +404,13 @@ def cancel_dispatch(
         existing = {"original_notes": event.notes}
 
     if existing.get("cancelled"):
-        return {"cancelled": True, "event_id": dispatch_id, "note": "Already cancelled."}
+        return {"cancelled": True, "event_id": start_id, "note": "Already cancelled."}
 
     existing["cancelled"]         = True
     existing["cancelled_at"]      = datetime.now(tz=timezone.utc).isoformat()
-    existing["cancelled_reason"]  = "POST /dispatch/{id}/cancel called directly"
+    existing["cancelled_reason"]  = "POST /start/{id}/cancel called directly"
     event.notes = json.dumps(existing, ensure_ascii=False)
     db.commit()
 
-    logger.warning("Dispatch event id=%d cancelled via API.", dispatch_id)
-    return {"cancelled": True, "event_id": dispatch_id}
+    logger.warning("Start event id=%d cancelled via API.", start_id)
+    return {"cancelled": True, "event_id": start_id}

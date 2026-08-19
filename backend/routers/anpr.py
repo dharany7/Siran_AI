@@ -3,14 +3,14 @@ backend/routers/anpr.py — POST /anpr/verify  (ANPR plate verification).
 
 Flow
 ----
-1. Accept image upload (multipart) + optional dispatch_id (Form field).
+1. Accept image upload (multipart) + optional start_id (Form field).
 2. Save to temp file, run anpr.detect_plate.detect_plate().
 3. Build response:
    a. Plate detected + IS in allowlist  → authorized, no action.
    b. Plate detected + NOT in allowlist → unauthorized:
         • Log a SecurityEvent with reason
           "unauthorized vehicle attempted green corridor".
-        • If dispatch_id provided, call POST /dispatch/{id}/cancel
+        • If start_id provided, call POST /start/{id}/cancel
           (in-process DB update — no HTTP round-trip).
    c. No plate detected → return result with is_detected=False, no crash.
 
@@ -40,16 +40,16 @@ router = APIRouter(prefix="/anpr", tags=["ANPR / Plate Verification"])
 UNAUTHORIZED_REASON = "unauthorized vehicle attempted green corridor"
 
 
-# ── Internal: cancel a dispatch event in-process ──────────────────────────────
+# ── Internal: cancel a start event in-process ──────────────────────────────
 
-def _cancel_dispatch_event(dispatch_id: int, plate_text: str, db: Session) -> bool:
+def _cancel_start_event(start_id: int, plate_text: str, db: Session) -> bool:
     """
     Mark a SirenEvent row as cancelled by appending a JSON note.
     Returns True if the row was found and updated.
     """
-    event = db.query(SirenEvent).filter(SirenEvent.id == dispatch_id).first()
+    event = db.query(SirenEvent).filter(SirenEvent.id == start_id).first()
     if event is None:
-        log.warning("cancel_dispatch: SirenEvent id=%d not found", dispatch_id)
+        log.warning("cancel_start: SirenEvent id=%d not found", start_id)
         return False
 
     try:
@@ -65,8 +65,8 @@ def _cancel_dispatch_event(dispatch_id: int, plate_text: str, db: Session) -> bo
     event.notes = json.dumps(existing, ensure_ascii=False)
     db.commit()
     log.warning(
-        "Dispatch event id=%d CANCELLED — unauthorized plate: %s",
-        dispatch_id, plate_text,
+        "Start event id=%d CANCELLED — unauthorized plate: %s",
+        start_id, plate_text,
     )
     return True
 
@@ -78,21 +78,21 @@ def _cancel_dispatch_event(dispatch_id: int, plate_text: str, db: Session) -> bo
     summary="Verify a vehicle's licence plate against the ambulance allowlist",
     description=(
         "Accepts an image upload (multipart/form-data) plus an optional "
-        "`dispatch_id`.\n\n"
+        "`start_id`.\n\n"
         "1. Runs OpenCV contour detection to find the plate region.\n"
         "2. Runs EasyOCR to read the plate text.\n"
         "3. Checks the normalized plate against the `AMBULANCE_ALLOWLIST`.\n\n"
         "If the plate is **not** in the allowlist:\n"
         "- Logs a `SecurityEvent` with reason "
         f'`"{UNAUTHORIZED_REASON}"`.\n'
-        "- If `dispatch_id` is provided, cancels that dispatch in the DB.\n\n"
+        "- If `start_id` is provided, cancels that start in the DB.\n\n"
         "If **no plate is detected** in the image, returns gracefully with "
         "`is_detected=false` — no crash."
     ),
 )
 def verify_plate(
     file:        UploadFile    = File(..., description="Vehicle image (jpg/png/bmp)"),
-    dispatch_id: int | None    = Form(default=None, description="SirenEvent id to cancel if unauthorized"),
+    start_id: int | None    = Form(default=None, description="SirenEvent id to cancel if unauthorized"),
     db:          Session       = Depends(get_db),
 ) -> dict:
     """Synchronous handler — safe for blocking EasyOCR inference."""
@@ -128,7 +128,7 @@ def verify_plate(
     )
 
     # ── 3. Security enforcement for unauthorized plates ───────────────────────
-    dispatch_cancelled = False
+    start_cancelled = False
     security_event_id: int | None = None
 
     if plate["is_detected"] and plate["is_authorized"] is False:
@@ -143,7 +143,7 @@ def verify_plate(
                 payload        = json.dumps({
                     "plate_text":   plate["plate_text"],
                     "raw_ocr":      plate["raw_ocr_text"],
-                    "dispatch_id":  dispatch_id,
+                    "start_id":  start_id,
                     "vehicle_type": plate["vehicle_type"],
                 }),
                 verdict        = "BLOCKED",
@@ -159,14 +159,14 @@ def verify_plate(
         except Exception as exc:
             log.error("Failed to log security event: %s", exc)
 
-        # Cancel dispatch if id provided
-        if dispatch_id is not None:
+        # Cancel start if id provided
+        if start_id is not None:
             try:
-                dispatch_cancelled = _cancel_dispatch_event(
-                    dispatch_id, plate["plate_text"] or "", db
+                start_cancelled = _cancel_start_event(
+                    start_id, plate["plate_text"] or "", db
                 )
             except Exception as exc:
-                log.error("Dispatch cancel failed: %s", exc)
+                log.error("Start cancel failed: %s", exc)
 
     # ── 4. Broadcast to live dashboard ───────────────────────────────────────
     if plate["is_detected"]:
@@ -179,7 +179,7 @@ def verify_plate(
                 "authorized":   plate["is_authorized"],
                 "vehicle_type": plate["vehicle_type"],
                 "confidence":   plate["confidence"],
-                "cancelled":    dispatch_cancelled,
+                "cancelled":    start_cancelled,
             },
         })
 
@@ -195,7 +195,7 @@ def verify_plate(
         message = (
             f"Plate {plate['plate_text']} is NOT in the allowlist "
             f"(classified as '{plate['vehicle_type']}'). "
-            + ("Dispatch cancelled. " if dispatch_cancelled else "")
+            + ("Start cancelled. " if start_cancelled else "")
             + "Security event logged."
         )
 
@@ -207,7 +207,7 @@ def verify_plate(
         "vehicle_type":        plate["vehicle_type"],
         "confidence":          plate["confidence"],
         "plate_region":        plate["plate_region"],
-        "dispatch_cancelled":  dispatch_cancelled,
+        "start_cancelled":  start_cancelled,
         "security_event_id":   security_event_id,
         "message":             message,
     }

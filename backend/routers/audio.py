@@ -7,9 +7,9 @@ Flow
 2. Save to a temp file and run audio_ml.infer.predict().
 3. Return the detection result immediately.
 4. If is_siren=True AND confidence > 0.8 AND the SUMO simulation is
-   running (app.state.sim), trigger the full ambulance dispatch pipeline
+   running (app.state.sim), trigger the full ambulance start pipeline
    (Navigator + GridController) with a hardcoded demo route start="1",
-   destination="2" — the same route used in manual /dispatch calls.
+   destination="2" — the same route used in manual /start calls.
 
 Response JSON
 -------------
@@ -19,8 +19,8 @@ Response JSON
   "label":           str,           // 'siren' | 'traffic' | 'other'
   "all_proba":       dict,          // per-class probabilities
   "synthetic_model": bool,
-  "dispatch_triggered": bool,
-  "dispatch_result": dict | null,   // full dispatch output if triggered
+  "start_triggered": bool,
+  "start_result": dict | null,   // full start output if triggered
   "message":         str            // human-readable summary for demo
 }
 
@@ -28,7 +28,7 @@ Threading note
 --------------
 Plain ``def`` handler — FastAPI runs it in a thread pool so the
 blocking librosa load + random forest inference + Gemini HTTP call
-(if dispatch triggers) never stall the async event loop.
+(if start triggers) never stall the async event loop.
 """
 from __future__ import annotations
 
@@ -48,9 +48,9 @@ from backend.routers.ws import bus as _bus
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/audio", tags=["Audio / Siren Detection"])
 
-# Confidence threshold above which an automatic dispatch is triggered
-DISPATCH_CONFIDENCE_THRESHOLD = 0.80
-# Hardcoded demo dispatch route
+# Confidence threshold above which an automatic start is triggered
+START_CONFIDENCE_THRESHOLD = 0.80
+# Hardcoded demo start route
 DEMO_START       = "1"
 DEMO_DESTINATION = "2"
 
@@ -69,10 +69,10 @@ def _load_infer():
         )
 
 
-def _run_dispatch_pipeline(sim, db: Session) -> dict:
+def _run_start_pipeline(sim, db: Session) -> dict:
     """
-    Run the MAS dispatch pipeline (Navigator + GridController) against
-    the live SumoEnv.  Mirrors the logic in backend/routers/dispatch.py
+    Run the MAS start pipeline (Navigator + GridController) against
+    the live SumoEnv.  Mirrors the logic in backend/routers/start.py
     but called programmatically rather than via HTTP.
     """
     from agents.ambulance_navigator import AmbulanceNavigatorAgent
@@ -119,7 +119,7 @@ def _run_dispatch_pipeline(sim, db: Session) -> dict:
                            "completed": completed},
         }, ensure_ascii=False)
         db.add(SirenEvent(
-            siren_type="audio_detect_dispatch",
+            siren_type="audio_detect_start",
             confidence=f"{DEMO_START}->{DEMO_DESTINATION}",
             notes=notes,
         ))
@@ -141,12 +141,12 @@ def _run_dispatch_pipeline(sim, db: Session) -> dict:
 
 @router.post(
     "/detect",
-    summary="Upload a WAV file — detect siren and optionally auto-dispatch",
+    summary="Upload a WAV file — detect siren and optionally auto-start",
     description=(
         "Accepts a WAV audio file (multipart upload). Runs the siren classifier "
         "(RandomForest on 80-dim MFCCs). If `is_siren=true` and "
-        f"`confidence > {DISPATCH_CONFIDENCE_THRESHOLD}` and the SUMO simulation "
-        "is running, automatically triggers the full MAS ambulance dispatch "
+        f"`confidence > {START_CONFIDENCE_THRESHOLD}` and the SUMO simulation "
+        "is running, automatically triggers the full MAS ambulance start "
         f"pipeline (demo route: junction {DEMO_START} → {DEMO_DESTINATION}).\n\n"
         "**Requires `python -m audio_ml.train` to have been run at least once.**"
     ),
@@ -191,43 +191,43 @@ def audio_detect(
         file.filename, result["is_siren"], result["confidence"], result["label"],
     )
 
-    # ── 3. Decide on dispatch ─────────────────────────────────────────────────
-    dispatch_triggered = False
-    dispatch_result    = None
+    # ── 3. Decide on start ─────────────────────────────────────────────────
+    start_triggered = False
+    start_result    = None
     sim = getattr(request.app.state, "sim", None)
     sim_connected = sim is not None and getattr(sim, "is_connected", False)
 
-    if result["is_siren"] and result["confidence"] > DISPATCH_CONFIDENCE_THRESHOLD:
+    if result["is_siren"] and result["confidence"] > START_CONFIDENCE_THRESHOLD:
         if sim_connected:
             log.info(
-                "[/audio/detect] SIREN CONFIRMED (conf=%.3f) — triggering dispatch %s->%s",
+                "[/audio/detect] SIREN CONFIRMED (conf=%.3f) — triggering start %s->%s",
                 result["confidence"], DEMO_START, DEMO_DESTINATION,
             )
-            dispatch_triggered = True
-            dispatch_result = _run_dispatch_pipeline(sim, db)
+            start_triggered = True
+            start_result = _run_start_pipeline(sim, db)
         else:
             log.info(
                 "[/audio/detect] SIREN CONFIRMED but sim not running — "
-                "skipping auto-dispatch (call POST /sim/start first)"
+                "skipping auto-start (call POST /sim/start first)"
             )
 
     # ── 4. Build summary message ──────────────────────────────────────────────
-    if result["is_siren"] and result["confidence"] > DISPATCH_CONFIDENCE_THRESHOLD:
-        if dispatch_triggered:
+    if result["is_siren"] and result["confidence"] > START_CONFIDENCE_THRESHOLD:
+        if start_triggered:
             msg = (
                 f"Siren detected (confidence {result['confidence']:.1%}). "
-                f"Green corridor dispatched: junction {DEMO_START} -> {DEMO_DESTINATION}."
+                f"Green corridor started: junction {DEMO_START} -> {DEMO_DESTINATION}."
             )
         else:
             msg = (
                 f"Siren detected (confidence {result['confidence']:.1%}) "
                 "but simulation is not running — start it with POST /sim/start "
-                "to enable auto-dispatch."
+                "to enable auto-start."
             )
     elif result["is_siren"]:
         msg = (
             f"Possible siren detected but confidence {result['confidence']:.1%} "
-            f"is below threshold {DISPATCH_CONFIDENCE_THRESHOLD:.0%} — no dispatch."
+            f"is below threshold {START_CONFIDENCE_THRESHOLD:.0%} — no start."
         )
     else:
         msg = f"No siren detected. Classified as '{result['label']}' ({result['confidence']:.1%})."
@@ -241,8 +241,8 @@ def audio_detect(
         "label":              result["label"],
         "all_proba":          result["all_proba"],
         "synthetic_model":    result["synthetic_model"],
-        "dispatch_triggered": dispatch_triggered,
-        "dispatch_result":    dispatch_result,
+        "start_triggered": start_triggered,
+        "start_result":    start_result,
         "message":            msg,
     }
 
@@ -250,12 +250,12 @@ def audio_detect(
     _bus.publish_sync({
         "type":    "siren",
         "msg":     f"[Audio] {result['label'].title()} — {result['confidence']:.1%} confidence"
-                   + ("  ✓ dispatch triggered" if dispatch_triggered else ""),
+                   + ("  ✓ start triggered" if start_triggered else ""),
         "payload": {
             "is_siren":    result["is_siren"],
             "confidence":  result["confidence"],
             "label":       result["label"],
-            "dispatched":  dispatch_triggered,
+            "started":  start_triggered,
         },
     })
 

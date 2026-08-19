@@ -21,7 +21,7 @@ through proxies and load balancers.
 
 Thread-safety note
 ------------------
-The handlers for /dispatch, /audio, /anpr are synchronous ``def`` functions
+The handlers for /start, /audio, /anpr are synchronous ``def`` functions
 running in FastAPI's thread-pool executor.  They cannot call ``await``
 directly.  Instead they use::
 
@@ -109,7 +109,7 @@ async def ws_logs(websocket: WebSocket) -> None:
 
     Message schema (all fields optional except ``type``):
     {
-        "type":       "siren" | "anpr" | "dispatch" | "security" | "sim" | "ping",
+        "type":       "siren" | "anpr" | "start" | "security" | "sim" | "ping",
         "msg":        "human-readable summary",
         "payload":    { ...full detail... },
         "ts":         "ISO-8601 timestamp"

@@ -100,7 +100,7 @@ def _log_security_event(
         "3. **Layer 3** — isolated Gemini call: 'SAFE' or 'BLOCKED'\n\n"
         "The result is logged to the `security_events` table.\n\n"
         "**Intended for demo and testing only** — use the guard implicitly "
-        "via `POST /dispatch` in production."
+        "via `POST /start` in production."
     ),
 )
 def test_injection(

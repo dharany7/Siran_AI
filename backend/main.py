@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.config import settings
 from backend.database import init_db
-from backend.routers import health, sim, dispatch, security, audio, anpr, ws, auth, acoustic_demo
+from backend.routers import health, sim, start, security, audio, anpr, ws, auth, acoustic_demo
 from backend.routers.route_geometry import router as route_geometry_router
 
 
@@ -166,7 +166,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(auth.router)         # /auth/signup, /auth/login
     app.include_router(sim.router)
-    app.include_router(dispatch.router)
+    app.include_router(start.router)
     app.include_router(security.router)
     app.include_router(audio.router)
     app.include_router(anpr.router)

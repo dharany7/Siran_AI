@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Siren-AI — Driver</title>
-  <meta name="description" content="Siren-AI ambulance driver — real-time dispatch and green corridor routing across Kilpauk, Chennai.">
+  <meta name="description" content="Siren-AI ambulance driver — real-time start and green corridor routing across Kilpauk, Chennai.">
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -98,7 +98,7 @@
     }
     .brand-sub { font-size: 10px; color: var(--muted); letter-spacing: 1.2px; text-transform: uppercase; margin-top: 2px; }
 
-    #dispatchingBadge {
+    #startingBadge {
       display: none;
       background: var(--red); color: #fff;
       font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700;
@@ -148,7 +148,7 @@
     #sheet.expanded {
       transform: translateY(0);
     }
-    #sheet.dispatching {
+    #sheet.starting {
       --sheet-peek: 160px;
       transform: translateY(calc(var(--sheet-h) - var(--sheet-peek)));
     }
@@ -398,8 +398,8 @@
       margin-left: auto; flex-shrink: 0;
     }
 
-    /* ── ETA dispatching view ────────────────────────────────────────── */
-    #dispatchView {
+    /* ── ETA starting view ────────────────────────────────────────── */
+    #startView {
       display: flex; flex-direction: column; gap: 12px;
     }
 
@@ -687,7 +687,7 @@
         flex-shrink: 0;
         background: var(--panel);
       }
-      #dispatchingBadgeSidebar {
+      #startingBadgeSidebar {
         font-size: 11px; font-weight: 700; letter-spacing: 1px;
         color: var(--red); background: var(--red-dim);
         border: 1px solid rgba(255,71,87,.3);
@@ -725,7 +725,7 @@
         min-height: 120px;
       }
 
-      /* ── Desktop dispatch layout ─────────────────────────────────────── */
+      /* ── Desktop start layout ─────────────────────────────────────── */
       /* viewDriver is always the active view on desktop — never swapped out */
       #viewDriver {
         display: flex;
@@ -742,19 +742,19 @@
         min-height: 0;
       }
       #driverContent .hosp-list { flex: 1; }
-      #dispatchBtn {
+      #startBtn {
         flex-shrink: 0;
         margin-top: 12px;
       }
 
-      /* ETA/dispatch card — hidden by default, shown on desktop during dispatch */
-      #dispatchCard {
+      /* ETA/start card — hidden by default, shown on desktop during start */
+      #startCard {
         display: none;
         flex-direction: column;
         gap: 12px;
       }
-      #viewDriver.dispatching-desktop #driverContent { display: none; }
-      #viewDriver.dispatching-desktop #dispatchCard  { display: flex; }
+      #viewDriver.starting-desktop #driverContent { display: none; }
+      #viewDriver.starting-desktop #startCard  { display: flex; }
     }
   </style>
 </head>
@@ -779,7 +779,7 @@
         <div class="brand-sub">Driver</div>
       </div>
     </div>
-    <div id="dispatchingBadge">🚨 EN ROUTE</div>
+    <div id="startingBadge">🚨 EN ROUTE</div>
   </div>
 
   <!-- FABs float over map on both layouts -->
@@ -800,7 +800,7 @@
           <div class="brand-sub">Driver</div>
         </div>
       </div>
-      <div id="dispatchingBadgeSidebar" style="display:none">🚨 EN ROUTE</div>
+      <div id="startingBadgeSidebar" style="display:none">🚨 EN ROUTE</div>
     </div>
     <!-- Mobile drag handle (hidden on desktop) -->
   <div class="sheet-handle" id="sheetHandle">
@@ -870,7 +870,7 @@
           <div class="online-dot"></div>
           <div>
             <div class="online-text" id="onlineText">Go Online</div>
-            <div style="font-size:11px;color:var(--muted)" id="onlineSubtext">Tap to start accepting dispatches</div>
+            <div style="font-size:11px;color:var(--muted)" id="onlineSubtext">Tap to start accepting startes</div>
           </div>
         </div>
         <div class="toggle-pill"></div>
@@ -915,9 +915,9 @@
         </div>
       </div>
 
-      <!-- ── Lower section: hospital list + dispatch button ── -->
-      <!-- On desktop this div is hidden during dispatch; on mobile the whole
-           viewDriver sheet-view is hidden by showView('viewDispatch') instead. -->
+      <!-- ── Lower section: hospital list + start button ── -->
+      <!-- On desktop this div is hidden during start; on mobile the whole
+           viewDriver sheet-view is hidden by showView('viewStart') instead. -->
       <div id="driverContent">
         <div class="section-label">Select Destination Hospital</div>
         <div class="hosp-search-wrap">
@@ -927,16 +927,16 @@
         <div class="hosp-list" id="hospList">
           <div style="text-align:center; padding:20px; color:var(--muted); font-size:13px">Loading hospitals…</div>
         </div>
-        <button class="btn-primary" id="dispatchBtn" onclick="handleDispatch()" disabled>
-          <span id="dispatchIcon">🚨</span>
-          <span id="dispatchLabel">DISPATCH</span>
+        <button class="btn-primary" id="startBtn" onclick="handleStart()" disabled>
+          <span id="startIcon">🚨</span>
+          <span id="startLabel">START</span>
         </button>
       </div>
 
-      <!-- ── Desktop-inline dispatch / ETA card ── -->
-      <!-- Shown instead of #driverContent on desktop during an active dispatch.
-           On mobile this node stays hidden; the mobile path uses #viewDispatch. -->
-      <div id="dispatchCard">
+      <!-- ── Desktop-inline start / ETA card ── -->
+      <!-- Shown instead of #driverContent on desktop during an active start.
+           On mobile this node stays hidden; the mobile path uses #viewStart. -->
+      <div id="startCard">
         <div class="eta-header">
           <div class="eta-icon">🚑</div>
           <div style="min-width:0">
@@ -979,15 +979,15 @@
           <div id="aiReasoningTextDesktop">Loading AI routing reasoning...</div>
         </div>
 
-        <button class="btn-cancel" onclick="finishDispatch()">✓ Mark Complete</button>
+        <button class="btn-cancel" onclick="finishStart()">✓ Mark Complete</button>
       </div>
     </div>
 
-    <!-- ── View: Active Dispatch (mobile-only) ── -->
-    <!-- On desktop this view is never activated; #dispatchCard inside viewDriver
+    <!-- ── View: Active Start (mobile-only) ── -->
+    <!-- On desktop this view is never activated; #startCard inside viewDriver
          is used instead so the persistent sidebar chrome stays visible. -->
-    <div class="sheet-view" id="viewDispatch">
-      <div id="dispatchView">
+    <div class="sheet-view" id="viewStart">
+      <div id="startView">
         <div class="eta-header">
           <div class="eta-icon">🚑</div>
           <div style="min-width:0">
@@ -1030,7 +1030,7 @@
           <div id="aiReasoningTextMobile">Loading AI routing reasoning...</div>
         </div>
 
-        <button class="btn-cancel" onclick="finishDispatch()">✓ Mark Complete</button>
+        <button class="btn-cancel" onclick="finishStart()">✓ Mark Complete</button>
       </div>
     </div>
 
@@ -1078,7 +1078,7 @@ let state = {
   filtered:       [],
   selectedHospId: null,
   isOnline:       false,
-  dispatching:    false,
+  starting:    false,
   lat:            KILPAUK[0],
   lng:            KILPAUK[1],
   demoGps:        true,   // ON by default — use preset instead of browser GPS
@@ -1124,14 +1124,14 @@ function makePulseIcon(color = '#22D9C0') {
 const driverMarker = L.marker(KILPAUK, { icon: makePulseIcon(), zIndexOffset: 1000 }).addTo(map);
 let hospitalMarker  = null;
 let routeLayer      = null;
-let routeGlowLayer  = null;   // shadow glow — stored so finishDispatch can remove it
+let routeGlowLayer  = null;   // shadow glow — stored so finishStart can remove it
 let hospitalMarkers = [];
 
-// Active-dispatch interval handles — stored at module scope so finishDispatch() can cancel them
+// Active-start interval handles — stored at module scope so finishStart() can cancel them
 let _dashAnimId  = null;   // dash-offset animation (straight-line fallback)
 let _moveIntId   = null;   // (unused — kept as guard slot, replaced by rAF)
 let _progIntId   = null;   // progress-bar interval
-let _pollIntId   = null;   // backend dispatch-status + completion polling
+let _pollIntId   = null;   // backend start-status + completion polling
 let _stepPollId  = null;   // (kept for cleanup guard — TLS now time-driven)
 let _rafId       = null;   // requestAnimationFrame handle for ambulance movement
 
@@ -1139,7 +1139,7 @@ let _rafId       = null;   // requestAnimationFrame handle for ambulance movemen
 // Each entry: { marker, junction_id, eta_seconds, green_end_s, mstate }
 let _tlsMarkers  = [];
 
-// Separate moving ambulance marker (the driver GPS dot never moves during dispatch)
+// Separate moving ambulance marker (the driver GPS dot never moves during start)
 let ambMarker    = null;
 
 // Hospital map icon
@@ -1183,7 +1183,7 @@ function makeAmbIcon() {
  * red signal markers on the map, and start the step-sync polling loop that
  * turns each marker green as the ambulance approaches.
  *
- * @param {Array}  tlsSchedule  - tls_schedule from the /dispatch response
+ * @param {Array}  tlsSchedule  - tls_schedule from the /start response
  * @param {string} authToken    - Bearer token for /sim/status
  */
 /**
@@ -1192,7 +1192,7 @@ function makeAmbIcon() {
  * wall-clock time from animStart relative to each entry's eta_seconds —
  * no TraCI poll needed (the sim runs synchronously before the response arrives).
  *
- * @param {Array}  tlsSchedule  - tls_schedule from the /dispatch response
+ * @param {Array}  tlsSchedule  - tls_schedule from the /start response
  * @param {number} animStart    - performance.now() value at animation start
  * @param {number} etaSeconds   - total route duration (distance_m / 13.889 m/s)
  */
@@ -1259,9 +1259,9 @@ async function placeTlsMarkers(tlsSchedule, animStart, etaSeconds) {
 
   // ── 3. Time-driven colour update loop (rAF-aligned, 100 ms checks) ───────
   // Elapsed seconds since animation started.  Stops when all signals are
-  // "passed" or when the dispatch ends (state.dispatching = false).
+  // "passed" or when the start ends (state.starting = false).
   _stepPollId = setInterval(() => {
-    if (!state.dispatching) { clearInterval(_stepPollId); _stepPollId = null; return; }
+    if (!state.starting) { clearInterval(_stepPollId); _stepPollId = null; return; }
     const elapsedS = (performance.now() - animStart) / 1000;
 
     for (const entry of _tlsMarkers) {
@@ -1583,8 +1583,8 @@ function renderOnlineState() {
   const sub  = document.getElementById('onlineSubtext');
   wrap.classList.toggle('online', state.isOnline);
   txt.textContent = state.isOnline ? 'Online' : 'Go Online';
-  sub.textContent = state.isOnline ? 'Ready for dispatches' : 'Tap to start accepting dispatches';
-  const dispBtn = document.getElementById('dispatchBtn');
+  sub.textContent = state.isOnline ? 'Ready for startes' : 'Tap to start accepting startes';
+  const dispBtn = document.getElementById('startBtn');
   if (dispBtn) dispBtn.disabled = !(state.isOnline && state.selectedHospId);
 }
 
@@ -1660,11 +1660,11 @@ function selectHospital(id) {
     .openPopup();
   map.flyTo([h.lat, h.lng], 16, { animate: true, duration: 1 });
 
-  // Enable dispatch
-  const btn = document.getElementById('dispatchBtn');
+  // Enable start
+  const btn = document.getElementById('startBtn');
   if (btn) btn.disabled = !(state.isOnline);
-  document.getElementById('dispatchLabel').textContent = `DISPATCH → ${h.name.split(' ').slice(0,2).join(' ')}`;
-  document.getElementById('dispatchIcon').textContent  = '🚨';
+  document.getElementById('startLabel').textContent = `START → ${h.name.split(' ').slice(0,2).join(' ')}`;
+  document.getElementById('startIcon').textContent  = '🚨';
 
   // Clear old route
   if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
@@ -1672,24 +1672,24 @@ function selectHospital(id) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Dispatch
+// Start
 // ─────────────────────────────────────────────────────────────────────────────
-async function handleDispatch() {
+async function handleStart() {
   if (!state.selectedHospId || !state.token) {
     toast('Select a hospital and log in first.', 'error'); return;
   }
   if (!state.isOnline) { toast('Go online first.', 'error'); return; }
 
-  const btn   = document.getElementById('dispatchBtn');
-  const label = document.getElementById('dispatchLabel');
-  const icon  = document.getElementById('dispatchIcon');
+  const btn   = document.getElementById('startBtn');
+  const label = document.getElementById('startLabel');
+  const icon  = document.getElementById('startIcon');
 
   btn.disabled = true;
-  icon.outerHTML = '<div class="spinner" id="dispatchIcon"></div>';
+  icon.outerHTML = '<div class="spinner" id="startIcon"></div>';
   label.textContent = 'ROUTING…';
 
   try {
-    const r = await fetch(`${API}/dispatch`, {
+    const r = await fetch(`${API}/start`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1718,23 +1718,23 @@ async function handleDispatch() {
         )
       );
       if (isSnapError) {
-        console.warn('[dispatch] snap error (hospital should have been filtered):', msg);
+        console.warn('[start] snap error (hospital should have been filtered):', msg);
       } else {
         toast(msg, 'error');
       }
       return;
     }
 
-    state.dispatching = true;
-    showDispatchView(data);
+    state.starting = true;
+    showStartView(data);
     animateRoute(data);
     // Mobile only: shift the sheet peek height
     if (!isDesktop()) {
-      sheet.classList.add('dispatching');
+      sheet.classList.add('starting');
       sheet.classList.remove('expanded');
     }
-    document.getElementById('dispatchingBadge').style.display = 'flex';
-    const sidebarBadge = document.getElementById('dispatchingBadgeSidebar');
+    document.getElementById('startingBadge').style.display = 'flex';
+    const sidebarBadge = document.getElementById('startingBadgeSidebar');
     if (sidebarBadge) sidebarBadge.style.display = '';
 
   } catch(e) {
@@ -1742,12 +1742,12 @@ async function handleDispatch() {
   } finally {
     btn.disabled = false;
     const sp = btn.querySelector('.spinner');
-    if (sp) { const s = document.createElement('span'); s.id='dispatchIcon'; s.textContent='🚨'; sp.replaceWith(s); }
-    label.textContent = 'DISPATCH';
+    if (sp) { const s = document.createElement('span'); s.id='startIcon'; s.textContent='🚨'; sp.replaceWith(s); }
+    label.textContent = 'START';
   }
 }
 
-function showDispatchView(data) {
+function showStartView(data) {
   const hosp  = state.hospitals.find(h => h.id === state.selectedHospId);
   const hospName  = data.hospital_name || hosp?.name || '—';
   const distTxt   = fmtDistVal(data.distance_m);
@@ -1760,9 +1760,9 @@ function showDispatchView(data) {
   const tls = data.tls_schedule || [];
 
   if (isDesktop()) {
-    // ── Desktop: stay in viewDriver, swap #driverContent ↔ #dispatchCard ──
+    // ── Desktop: stay in viewDriver, swap #driverContent ↔ #startCard ──
     const viewDriver = document.getElementById('viewDriver');
-    viewDriver.classList.add('dispatching-desktop');
+    viewDriver.classList.add('starting-desktop');
 
     document.getElementById('etaHospital').textContent = hospName;
     document.getElementById('etaDist').textContent     = distTxt;
@@ -1787,7 +1787,7 @@ function showDispatchView(data) {
       }
     } else {
     // ── Mobile: full-page view swap ───────────────────────────────────────
-    showView('viewDispatch');
+    showView('viewStart');
 
     document.getElementById('etaHospitalMobile').textContent = hospName;
     document.getElementById('etaDistMobile').textContent     = distTxt;
@@ -1825,8 +1825,8 @@ function showDispatchView(data) {
 }
 
 async function animateRoute(data) {
-  // Cancel any leftover intervals/rAF from a previous dispatch
-  _clearDispatchIntervals();
+  // Cancel any leftover intervals/rAF from a previous start
+  _clearStartIntervals();
   _removeTlsMarkers();
   if (ambMarker) { map.removeLayer(ambMarker); ambMarker = null; }
 
@@ -1948,7 +1948,7 @@ async function animateRoute(data) {
   const animStart = performance.now();
 
   function rafStep(now) {
-    if (!state.dispatching) return;   // cancelled externally — stop
+    if (!state.starting) return;   // cancelled externally — stop
 
     const elapsed = now - animStart;          // ms
     const t       = Math.min(elapsed / etaMs, 1.0);
@@ -1969,7 +1969,7 @@ async function animateRoute(data) {
         }));
       }
       // Give the driver 3 seconds to see the "arrived" state, then auto-finish
-      setTimeout(() => { if (state.dispatching) finishDispatch(true); }, 3000);
+      setTimeout(() => { if (state.starting) finishStart(true); }, 3000);
     }
   }
   _rafId = requestAnimationFrame(rafStep);
@@ -1991,7 +1991,7 @@ async function animateRoute(data) {
   placeTlsMarkers(data.tls_schedule || [], animStart, rawEta);
 
   // ── 11. WebSocket listener for live updates ───────────────────────────────
-  // Replaces the broken GET /dispatch/status polling loop.
+  // Replaces the broken GET /start/status polling loop.
   if (!window._wsLogsConnected) {
     window._wsLogsConnected = true;
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -1999,8 +1999,8 @@ async function animateRoute(data) {
     ws.onmessage = (evt) => {
       try {
         const data = JSON.parse(evt.data);
-        if (data.event === "DISPATCH_COMPLETED" && state.dispatching) {
-          finishDispatch(true);
+        if (data.event === "START_COMPLETED" && state.starting) {
+          finishStart(true);
         } else if (data.event === "SIGNAL_PREEMPTED" || (data.payload && data.payload.signal_green)) {
           const jid = data.junction_id || (data.payload && data.payload.junction_id);
           const entry = _tlsMarkers.find(m => m.junction_id === jid);
@@ -2024,8 +2024,8 @@ function _removeTlsMarkers() {
   _tlsMarkers = [];
 }
 
-/** Cancel every timer/interval and rAF started by the current dispatch session. */
-function _clearDispatchIntervals() {
+/** Cancel every timer/interval and rAF started by the current start session. */
+function _clearStartIntervals() {
   if (_dashAnimId !== null) { clearInterval(_dashAnimId); _dashAnimId = null; }
   if (_moveIntId  !== null) { clearInterval(_moveIntId);  _moveIntId  = null; }
   if (_progIntId  !== null) { clearInterval(_progIntId);  _progIntId  = null; }
@@ -2035,31 +2035,31 @@ function _clearDispatchIntervals() {
 }
 
 /**
- * Tear down an active dispatch.
+ * Tear down an active start.
  * Called either by the driver tapping "Mark Complete" (auto=false)
  * or by the backend-status poll when completed:true is returned (auto=true).
  */
-function finishDispatch(auto = false) {
-  if (!state.dispatching) return;   // guard against double-call
-  state.dispatching = false;
+function finishStart(auto = false) {
+  if (!state.starting) return;   // guard against double-call
+  state.starting = false;
 
   // Stop all running intervals — route survives until this point
-  _clearDispatchIntervals();
+  _clearStartIntervals();
 
   // Hide EN ROUTE badges
-  document.getElementById('dispatchingBadge').style.display = 'none';
-  const sidebarBadge = document.getElementById('dispatchingBadgeSidebar');
+  document.getElementById('startingBadge').style.display = 'none';
+  const sidebarBadge = document.getElementById('startingBadgeSidebar');
   if (sidebarBadge) sidebarBadge.style.display = 'none';
 
   if (isDesktop()) {
-    // Restore #driverContent, hide #dispatchCard
-    document.getElementById('viewDriver').classList.remove('dispatching-desktop');
+    // Restore #driverContent, hide #startCard
+    document.getElementById('viewDriver').classList.remove('starting-desktop');
     document.getElementById('progressBar').style.width = '0%';
     // tlsRow may have been shown; reset it
     document.getElementById('tlsRow').style.display = 'none';
   } else {
     // Mobile: undo sheet peek override and restore viewDriver
-    sheet.classList.remove('dispatching', 'expanded');
+    sheet.classList.remove('starting', 'expanded');
     document.getElementById('progressBarMobile').style.width = '0%';
     document.getElementById('tlsRowMobile').style.display = 'none';
     showView('viewDriver');
@@ -2072,13 +2072,13 @@ function finishDispatch(auto = false) {
   if (ambMarker)      { map.removeLayer(ambMarker);      ambMarker      = null; }
   _removeTlsMarkers();
 
-  // Keep driverMarker at its true GPS position (it never moved during dispatch)
+  // Keep driverMarker at its true GPS position (it never moved during start)
   driverMarker.setLatLng([state.lat, state.lng]);
   map.flyTo([state.lat, state.lng], 15);
-  document.getElementById('dispatchLabel').textContent = 'DISPATCH';
+  document.getElementById('startLabel').textContent = 'START';
   state.selectedHospId = null;
   renderHospitalList(state.hospitals);
-  toast(auto ? '✅ Dispatch completed (confirmed by server)' : 'Dispatch complete! 🎉', 'success', 4000);
+  toast(auto ? '✅ Start completed (confirmed by server)' : 'Start complete! 🎉', 'success', 4000);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

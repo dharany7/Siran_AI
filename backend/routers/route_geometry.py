@@ -163,7 +163,7 @@ def _edges_to_coordinates(edge_ids: list[str]) -> list[list[float]]:
 def route_geometry(
     edges: str = Query(
         ...,
-        description="Comma-separated SUMO edge IDs (as returned by POST /dispatch in route_edges)",
+        description="Comma-separated SUMO edge IDs (as returned by POST /start in route_edges)",
     ),
     max_edges: int = Query(300, description="Limit edges processed (for performance)"),
 ):
@@ -239,7 +239,7 @@ def _ensure_junction_cache() -> None:
     description=(
         "Parses `kilpauk.net.xml` `<junction>` elements and returns `{junction_id: [lat, lng]}`"
         " for the given comma-separated junction IDs.  Used by the driver frontend to place "
-        "traffic-signal markers on the Leaflet map during an active dispatch."
+        "traffic-signal markers on the Leaflet map during an active start."
     ),
 )
 def junction_positions(

@@ -19,7 +19,7 @@ Pipeline stages
 Each stage is broadcast to /ws/logs as an "acoustic_demo" event *before*
 the HTTP response is returned, so the ops dashboard updates live.
 
-WS event shape (matches the shape produced by /dispatch — same dashboard)
+WS event shape (matches the shape produced by /start — same dashboard)
 ─────────────────────────────────────────────────────────────────────────
 {
   "type":    "acoustic_demo",

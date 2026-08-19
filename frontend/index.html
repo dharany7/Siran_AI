@@ -550,7 +550,7 @@
       color: var(--muted);
     }
 
-    /* ---- PAGE 2: Live Corridor / Dispatch ---- */
+    /* ---- PAGE 2: Live Corridor / Start ---- */
     .corridor-wrap {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -1120,7 +1120,7 @@
 
       <nav class="nav">
         <div class="nav-item active" data-page="p1"><span class="dot"></span> Command Dashboard</div>
-        <div class="nav-item" data-page="p2"><span class="dot"></span> Live Dispatch</div>
+        <div class="nav-item" data-page="p2"><span class="dot"></span> Live Start</div>
         <div class="nav-item" data-page="p3"><span class="dot"></span> Security &amp; Verification</div>
         <div class="nav-item" data-page="p4"><span class="dot"></span> Impact &amp; Scoring</div>
         <div class="nav-item" data-page="p5"><span class="dot"></span> &#127908; Acoustic Demo</div>
@@ -1157,7 +1157,7 @@
             <div class="delta up">↓ 68% vs. static signals</div>
           </div>
           <div class="card stat-card">
-            <div class="eyebrow">Dispatches today</div>
+            <div class="eyebrow">Startes today</div>
             <div class="num">27</div>
             <div class="label">across 4 monitored junctions</div>
             <div class="delta up">100% routed successfully</div>
@@ -1228,7 +1228,7 @@
           <div class="corridor-wrap">
             <div class="card-head" style="margin-bottom:0;">
               <div>
-                <div class="eyebrow">Active dispatch #0428</div>
+                <div class="eyebrow">Active start #0428</div>
                 <h3 style="font-size:15px;">Junction 1 → Junction 2, via Anna Salai corridor</h3>
               </div>
               <span class="badge ok">● En route</span>
@@ -1272,7 +1272,7 @@
             </div>
             <div class="log-feed" id="logFeed">
               <div class="log-line"><span class="log-time">14:27:08</span><span class="log-tag sys">SYS</span><span
-                  class="log-text">Dispatch #0428 initiated — start=J1, dest=J4</span></div>
+                  class="log-text">Start #0428 initiated — start=J1, dest=J4</span></div>
               <div class="log-line"><span class="log-time">14:27:08</span><span class="log-tag nav">NAV</span><span
                   class="log-text">Querying live SUMO state: 3 vehicles, TLS='GrGr'</span></div>
               <div class="log-line"><span class="log-time">14:27:09</span><span class="log-tag nav">NAV</span><span
@@ -1289,7 +1289,7 @@
               <div class="log-line"><span class="log-time">14:27:15</span><span class="log-tag grid">GRID</span><span
                   class="log-text">Junction J2 → GREEN (was GrGr, ETA reached)</span></div>
               <div class="log-line"><span class="log-time">14:27:15</span><span class="log-tag sec">SEC</span><span
-                  class="log-text">Schema + injection check passed on dispatch payload</span></div>
+                  class="log-text">Schema + injection check passed on start payload</span></div>
               <div class="log-line"><span class="log-time">14:27:19</span><span class="log-tag grid">GRID</span><span
                   class="log-text">Junction J3 → GREEN, restoring J2 to normal cycle</span></div>
               <div class="log-line"><span class="log-time">14:27:23</span><span class="log-tag sys">SYS</span><span
@@ -1356,7 +1356,7 @@
             </div>
             <div class="verify-row">
               <span class="mono" style="color:var(--muted); font-size:11px;">14:11:03</span>
-              <span>Simulated prompt-injection on /dispatch payload</span>
+              <span>Simulated prompt-injection on /start payload</span>
               <span class="plate">—</span>
               <span style="color:var(--muted); font-size:11.5px;">API request</span>
               <span class="pill block">Blocked</span>
@@ -1594,7 +1594,7 @@
     const pages = document.querySelectorAll('.page');
     const titles = {
       p1: ['Command Dashboard', 'Real-time multi-agent traffic control overview'],
-      p2: ['Live Dispatch', 'Agent negotiation for active ambulance corridor'],
+      p2: ['Live Start', 'Agent negotiation for active ambulance corridor'],
       p3: ['Security & Verification', 'ANPR checks and prompt-injection guard events'],
       p4: ['Impact & Scoring', 'Rubric alignment and architecture summary'],
       p5: ['Acoustic Trigger Demo', 'Pre-recorded clip → RF classifier → ANPR → TLS signal flip']
@@ -1637,9 +1637,9 @@
       }
 
       // Seed from the values already displayed so the counters don't reset.
-      const $dispatchNum = findStatNum('Dispatches today');
+      const $startNum = findStatNum('Startes today');
       const $blockNum    = findStatNum('Misuse attempts blocked');
-      let dispatchCount  = parseInt(($dispatchNum && $dispatchNum.textContent) || '27', 10);
+      let startCount  = parseInt(($startNum && $startNum.textContent) || '27', 10);
       let blockCount     = parseInt(($blockNum    && $blockNum.textContent)    || '3',  10);
 
       // ── Log-feed ──────────────────────────────────────────────────────────
@@ -1647,7 +1647,7 @@
 
       // Map WS event types to the [label, css-modifier] pairs already in use.
       const TAG_MAP = {
-        dispatch: ['NAV',  'nav'],
+        start: ['NAV',  'nav'],
         siren:    ['SYS',  'sys'],
         anpr:     ['ANPR', 'sec'],
         security: ['SEC',  'sec'],
@@ -1697,10 +1697,10 @@
 
         appendLog(type, msg);
 
-        // Dispatches today
-        if (type === 'dispatch') {
-          dispatchCount++;
-          if ($dispatchNum) $dispatchNum.textContent = dispatchCount;
+        // Startes today
+        if (type === 'start') {
+          startCount++;
+          if ($startNum) $startNum.textContent = startCount;
         }
 
         // Misuse attempts blocked = security BLOCKED + anpr unauthorised
